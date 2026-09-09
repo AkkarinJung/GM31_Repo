@@ -67,3 +67,12 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+.vs/GM31_Game/FileContentIndex/2d2155a8-f7ee-47da-a4c6-851df2f87033.vsidx
+.vs/GM31_Game/v17/.suo
+.vs/GM31_Game/v17/Browse.VC.db
+.vs/GM31_Game/v17/Browse.VC.db-shm
+.vs/GM31_Game/v17/Browse.VC.db-wal
+.vs/GM31_Game/v17/Browse.VC.opendb
+.vs/GM31_Game/v17/DocumentLayout.backup.json
+.vs/GM31_Game/v17/DocumentLayout.json
+.vs/GM31_Game/v17/ipch/AutoPCH/c626eea81d56c9bd/PLAYER.ipch
