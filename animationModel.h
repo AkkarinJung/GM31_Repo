@@ -27,6 +27,7 @@ struct BONE
 	aiMatrix4x4 Matrix;
 	aiMatrix4x4 AnimationMatrix;
 	aiMatrix4x4 OffsetMatrix;
+	aiMatrix4x4 WorldMatrix;
 };
 
 class AnimationModel : public Component
@@ -55,4 +56,6 @@ public:
 	void Update(const char* AnimationName1, int Frame1,
 				const char* AnimationName2, int Frame2, float Blend);
 	void Draw() override;
+	bool GetBoneMatrix(const std::string& BoneName, XMMATRIX* OutMatrix) const;
+	void DebugPrintBoneNames() const;
 };

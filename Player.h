@@ -29,6 +29,9 @@ private:
 
     float m_Blend = 0.0f;
 
+    class BoneAttachPoint* m_WeaponSocket;
+    class Sword* m_Weapon;
+
 public:
     void Init() override;
     void Uninit() override;

@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="animationModel.cpp" />
     <ClCompile Include="audio.cpp" />
+    <ClCompile Include="BoneAttachPoint.cpp" />
     <ClCompile Include="Box.cpp" />
     <ClCompile Include="Bullet.cpp" />
     <ClCompile Include="Camera.cpp" />
@@ -44,12 +45,15 @@
     <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
     <ClCompile Include="SkyDome.cpp" />
+    <ClCompile Include="Sword.cpp" />
     <ClCompile Include="Title.cpp" />
     <ClCompile Include="Tree.cpp" />
+    <ClCompile Include="Weapon.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="animationModel.h" />
     <ClInclude Include="audio.h" />
+    <ClInclude Include="BoneAttachPoint.h" />
     <ClInclude Include="Box.h" />
     <ClInclude Include="Bullet.h" />
     <ClInclude Include="Camera.h" />
@@ -76,9 +80,11 @@
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="SkyDome.h" />
+    <ClInclude Include="Sword.h" />
     <ClInclude Include="Title.h" />
     <ClInclude Include="Tree.h" />
     <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Weapon.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\common.hlsl">

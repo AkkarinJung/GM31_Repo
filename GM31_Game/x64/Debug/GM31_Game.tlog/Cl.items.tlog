@@ -1,5 +1,6 @@
 C:\Users\Akkarin\Desktop\GM31_Repo\animationModel.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\animationModel.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\audio.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\audio.obj
+C:\Users\Akkarin\Desktop\GM31_Repo\BoneAttachPoint.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\BoneAttachPoint.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\Box.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Box.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\Bullet.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Bullet.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\Camera.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Camera.obj
@@ -23,5 +24,7 @@ C:\Users\Akkarin\Desktop\GM31_Repo\Scene.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\
 C:\Users\Akkarin\Desktop\GM31_Repo\Score.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Score.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\Shadow.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Shadow.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\SkyDome.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\SkyDome.obj
+C:\Users\Akkarin\Desktop\GM31_Repo\Sword.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Sword.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\Title.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Title.obj
 C:\Users\Akkarin\Desktop\GM31_Repo\Tree.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Tree.obj
+C:\Users\Akkarin\Desktop\GM31_Repo\Weapon.cpp;C:\Users\Akkarin\Desktop\GM31_Repo\GM31_Game\x64\Debug\Weapon.obj

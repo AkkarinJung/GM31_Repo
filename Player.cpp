@@ -18,6 +18,9 @@
 #include "Shadow.h"
 #include "MeshField.h"
 
+#include "BoneAttachPoint.h"
+#include "Sword.h"   
+
 void Player::Init()
 {
     m_Layer = 1;
@@ -31,9 +34,16 @@ void Player::Init()
     m_AnimationModel->Load("asset\\model\\Akai.fbx");
     m_AnimationModel->LoadAnimation("asset\\model\\Akai_Idle.fbx", "Idle");
     m_AnimationModel->LoadAnimation("asset\\model\\Akai_Run.fbx", "Run");
+    m_AnimationModel->DebugPrintBoneNames();
 
     m_AnimationName = "Idle";
     m_NextAnimationName = "Idle";
+
+    m_WeaponSocket = AddGameComponent<BoneAttachPoint>(this);
+    m_WeaponSocket->SetBone(m_AnimationModel, "mixamorig:RightHand");
+
+    m_Weapon = Manager::AddGameObj<Sword>();
+    m_WeaponSocket->Attach(m_Weapon);
 
     // シェーダー読込
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout,
@@ -239,9 +249,11 @@ void Player::Update()
 
     if (Input::GetKeyTrigger('J'))
     {
-        Bullet* bullet = Manager::AddGameObj<Bullet>();
-        bullet->SetPosition(m_Position);
-        bullet->SetVelocity(GetFoward() * 20.0f);
+        //Bullet* bullet = Manager::AddGameObj<Bullet>();
+        //bullet->SetPosition(m_Position);
+        //bullet->SetVelocity(GetFoward() * 20.0f);
+
+        m_Weapon->Use(this);
     }
     
     if (m_Ground)

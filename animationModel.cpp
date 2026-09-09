@@ -409,10 +409,39 @@
 		aiMatrix4x4 worldMatrix;
 		worldMatrix = matrix * bone->AnimationMatrix;
 
+		bone->WorldMatrix = worldMatrix;
 		bone->Matrix = worldMatrix * bone->OffsetMatrix;
 		for (unsigned int n = 0; n < node->mNumChildren; n++)
 		{
 			UpdateBoneMatrix(node->mChildren[n], worldMatrix);
+		}
+	}
+
+	bool AnimationModel::GetBoneMatrix(const std::string& BoneName, XMMATRIX* OutMatrix) const
+	{
+		auto it = m_Bone.find(BoneName);
+		if (it == m_Bone.end())
+			return false;
+
+		const aiMatrix4x4& m = it->second.WorldMatrix;
+
+		// aiMatrix4x4 is row-major (a1-a4 = row 0, b1-b4 = row 1, ...),
+		// which is exactly the row order XMMatrixSet expects.
+		*OutMatrix = XMMatrixSet(
+			m.a1, m.a2, m.a3, m.a4,
+			m.b1, m.b2, m.b3, m.b4,
+			m.c1, m.c2, m.c3, m.c4,
+			m.d1, m.d2, m.d3, m.d4);
+
+		return true;
+	}
+
+	void AnimationModel::DebugPrintBoneNames() const
+	{
+		for (const auto& pair : m_Bone)
+		{
+			OutputDebugStringA(pair.first.c_str());
+			OutputDebugStringA("\n");
 		}
 	}
 

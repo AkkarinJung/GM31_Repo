@@ -19,6 +19,12 @@
     <Filter Include="DirectXTex">
       <UniqueIdentifier>{aac98d31-f398-45e3-b7f2-fcdf9beab3e8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\WeaponClass">
+      <UniqueIdentifier>{3185005d-aa7c-4b52-82d6-09df2659be8a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\WeaponClass">
+      <UniqueIdentifier>{1faba5ed-26c7-47d4-b276-ee8550ea6201}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -101,6 +107,15 @@
     </ClCompile>
     <ClCompile Include="MeshField.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BoneAttachPoint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Weapon.cpp">
+      <Filter>Source Files\WeaponClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Sword.cpp">
+      <Filter>Source Files\WeaponClass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -196,6 +211,15 @@
     </ClInclude>
     <ClInclude Include="MeshField.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BoneAttachPoint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sword.h">
+      <Filter>Header Files\WeaponClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Weapon.h">
+      <Filter>Header Files\WeaponClass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
