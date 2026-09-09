@@ -425,13 +425,15 @@
 
 		const aiMatrix4x4& m = it->second.WorldMatrix;
 
-		// aiMatrix4x4 is row-major (a1-a4 = row 0, b1-b4 = row 1, ...),
-		// which is exactly the row order XMMatrixSet expects.
+		// aiMatrix4x4 is column-vector convention (translation in the last
+		// COLUMN: a4,b4,c4). This codebase's DirectXMath usage is row-vector
+		// convention (translation in the last ROW) - so this is the transpose
+		// of the raw element layout, not a straight copy.
 		*OutMatrix = XMMatrixSet(
-			m.a1, m.a2, m.a3, m.a4,
-			m.b1, m.b2, m.b3, m.b4,
-			m.c1, m.c2, m.c3, m.c4,
-			m.d1, m.d2, m.d3, m.d4);
+			m.a1, m.b1, m.c1, m.d1,
+			m.a2, m.b2, m.c2, m.d2,
+			m.a3, m.b3, m.c3, m.d3,
+			m.a4, m.b4, m.c4, m.d4);
 
 		return true;
 	}

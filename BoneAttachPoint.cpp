@@ -75,14 +75,66 @@ void BoneAttachPoint::Update()
     XMVECTOR scale, rotQuat, translation;
     XMMatrixDecompose(&scale, &rotQuat, &translation, finalMatrix);
 
+    // The sword is parented to m_GameObject (e.g. Player), whose own
+    // GetMatrx() will multiply this local transform by its own scale
+    // (e.g. Player's 0.01 body-mesh correction). That scale has nothing
+    // to do with the weapon's own mesh units, so cancel it back out of
+    // just the scale component - position/rotation still inherit the
+    // parent normally, which is what makes it "follow".
+    XMVECTOR ownerScale, ownerRotQuat, ownerTranslation;
+    XMMatrixDecompose(&ownerScale, &ownerRotQuat, &ownerTranslation, m_GameObject->GetMatrx());
+
+    XMFLOAT3 ownerScaleF;
+    XMStoreFloat3(&ownerScaleF, ownerScale);
+
+    Vector3 scaleVec;
+    XMStoreFloat3((XMFLOAT3*)&scaleVec, scale);
+    scaleVec.x /= ownerScaleF.x;
+    scaleVec.y /= ownerScaleF.y;
+    scaleVec.z /= ownerScaleF.z;
+
     Vector3 position;
     XMStoreFloat3((XMFLOAT3*)&position, translation);
 
-    // The attached item stays parented to the SAME GameObject that owns
-    // this AnimationModel (e.g. Player). Its own GetMatrx() will multiply
-    // by that owner's world matrix on top of this, exactly like the
-    // skinned mesh vertices already do - so this is correct without any
-    // extra world-matrix math here.
     m_Attached->SetPosition(position);
     m_Attached->SetRotation(QuaternionToEuler(rotQuat));
+    m_Attached->SetScale(scaleVec);
+}
+
+void BoneAttachPoint::DebugPrintTransform() const
+{
+    char buffer[256];
+
+    sprintf_s(buffer,
+        "[Socket] offset pos(%.4f, %.4f, %.4f) rot(%.4f, %.4f, %.4f) scale(%.4f, %.4f, %.4f)\n",
+        m_LocalPosition.x, m_LocalPosition.y, m_LocalPosition.z,
+        m_LocalRotation.x, m_LocalRotation.y, m_LocalRotation.z,
+        m_LocalScale.x, m_LocalScale.y, m_LocalScale.z);
+    OutputDebugStringA(buffer);
+
+    if (m_Attached != nullptr)
+    {
+        Vector3 pos = m_Attached->GetPosition();
+        Vector3 rot = m_Attached->GetRotation();
+        Vector3 scale = m_Attached->GetScale();
+
+        sprintf_s(buffer,
+            "[Sword] applied pos(%.4f, %.4f, %.4f) rot(%.4f, %.4f, %.4f) scale(%.4f, %.4f, %.4f)\n",
+            pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, scale.x, scale.y, scale.z);
+        OutputDebugStringA(buffer);
+    }
+    else
+    {
+        OutputDebugStringA("[Sword] nothing attached\n");
+    }
+}
+
+void BoneAttachPoint::AdjustLocalPosition(const Vector3& Delta)
+{
+    m_LocalPosition += Delta;
+}
+
+void BoneAttachPoint::AdjustLocalRotation(const Vector3& Delta)
+{
+    m_LocalRotation += Delta;
 }

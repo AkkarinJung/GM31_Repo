@@ -40,8 +40,11 @@ void Player::Init()
     m_NextAnimationName = "Idle";
 
     m_WeaponSocket = AddGameComponent<BoneAttachPoint>(this);
-    m_WeaponSocket->SetBone(m_AnimationModel, "mixamorig:RightHand");
-
+    m_WeaponSocket->SetBone(m_AnimationModel, "mixamorig:LeftHand");
+    m_WeaponSocket->SetLocalTransform(
+        { 8.6667f, 4.0f, -6.6667f },   // <-- this is the position offset, currently zero
+        { 10.0f,-0.36f, 0.0f },   // rotation offset
+        { 1.0f, 1.0f, 1.0f }); // scale (or whatever you landed on)
     m_Weapon = Manager::AddGameObj<Sword>();
     m_WeaponSocket->Attach(m_Weapon);
 
@@ -120,6 +123,29 @@ void Player::Update()
         m_Velocity -= forward * (50.0f * dt);
         move = true;
     }
+
+    // --- temporary sword offset tuning - remove once satisfied ---
+    float tuneStep = 20.0f * dt;    // position, raw model-space units/sec
+    float tuneRotStep = 2.0f * dt;  // rotation, radians/sec
+
+    if (Input::GetKeyPress('H')) m_WeaponSocket->AdjustLocalPosition({ -tuneStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('K')) m_WeaponSocket->AdjustLocalPosition({ tuneStep, 0.0f, 0.0f });
+
+    if (Input::GetKeyPress('N')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, -tuneStep, 0.0f });
+    if (Input::GetKeyPress('U')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, tuneStep, 0.0f });
+
+    if (Input::GetKeyPress('G')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, -tuneStep });
+    if (Input::GetKeyPress('T')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, tuneStep });
+
+    if (Input::GetKeyPress('Z')) m_WeaponSocket->AdjustLocalRotation({ -tuneRotStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('X')) m_WeaponSocket->AdjustLocalRotation({ tuneRotStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('C')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, -tuneRotStep, 0.0f });
+    if (Input::GetKeyPress('V')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, tuneRotStep, 0.0f });
+    if (Input::GetKeyPress('B')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, -tuneRotStep });
+    if (Input::GetKeyPress('M')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, tuneRotStep });
+
+    if (Input::GetKeyTrigger('P'))
+        m_WeaponSocket->DebugPrintTransform();
 
     if (move)
     {
@@ -271,6 +297,9 @@ void Player::Update()
     m_Blend += 0.1f;
     if (m_Blend > 1.0f)
         m_Blend = 1.0f;
+
+    m_AnimationModel->Update(m_AnimationName.c_str(), m_AnimationFrame, m_NextAnimationName.c_str(), m_NextAnimationFrame, m_Blend);
+
     GameObject::Update();
 }
 
@@ -283,7 +312,6 @@ void Player::Draw()
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
     Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
 
-    m_AnimationModel->Update(m_AnimationName.c_str(), m_AnimationFrame, m_NextAnimationName.c_str(), m_NextAnimationFrame, m_Blend);
     GameObject::Draw();
 }
 

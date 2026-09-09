@@ -108,13 +108,13 @@
     <ClCompile Include="MeshField.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BoneAttachPoint.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Weapon.cpp">
       <Filter>Source Files\WeaponClass</Filter>
     </ClCompile>
     <ClCompile Include="Sword.cpp">
+      <Filter>Source Files\WeaponClass</Filter>
+    </ClCompile>
+    <ClCompile Include="BoneAttachPoint.cpp">
       <Filter>Source Files\WeaponClass</Filter>
     </ClCompile>
   </ItemGroup>
@@ -212,13 +212,13 @@
     <ClInclude Include="MeshField.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BoneAttachPoint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Sword.h">
       <Filter>Header Files\WeaponClass</Filter>
     </ClInclude>
     <ClInclude Include="Weapon.h">
+      <Filter>Header Files\WeaponClass</Filter>
+    </ClInclude>
+    <ClInclude Include="BoneAttachPoint.h">
       <Filter>Header Files\WeaponClass</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,27 +2,27 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\x64\Debug\GM31_Game.exe</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\x64\Debug\GM31_Game.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles>
     <ContentFile>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\shader\FieldPS.cso</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\FieldPS.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\shader\FieldVS.cso</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\FieldVS.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\shader\litTexturePS.cso</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\litTexturePS.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\shader\litTextureVS.cso</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\litTextureVS.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\unlitTexturePS.cso</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\unlitTexturePS.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\Akkarin\Desktop\GM31_Repo\unlitTextureVS.cso</FullPath>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\unlitTextureVS.cso</FullPath>
     </ContentFile>
   </ContentFiles>
   <SatelliteDlls />

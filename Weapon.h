@@ -13,11 +13,17 @@ protected:
     float m_Cooldown = 0.3f;
     float m_CooldownTimer = 0.0f;
 
+    ID3D11InputLayout* m_VertexLayout = nullptr;
+    ID3D11VertexShader* m_VertexShader = nullptr;
+    ID3D11PixelShader* m_PixelShader = nullptr;
+
     virtual void LoadModel() {}; // derived class loads its own mesh here
 
 public:
     void Init() override;
+    void Uninit() override;
     void Update() override;
+    void Draw() override;
 
     virtual void Use(GameObject* Owner) {}; // fire / swing, override per weapon
 

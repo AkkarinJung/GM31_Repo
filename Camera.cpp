@@ -26,6 +26,18 @@ void  Camera::Update()
     if (Input::GetKeyPress(VK_LEFT))
         m_Rotation.y -= 3.0f * dt;
 
+    if (Input::GetKeyPress(VK_UP))
+        m_Rotation.x += 3.0f * dt;
+    if (Input::GetKeyPress(VK_DOWN))
+        m_Rotation.x -= 3.0f * dt;
+
+    // clamp pitch so the orbit can't flip past straight up/down
+    const float pitchLimit = 1.2f; // ~68 degrees
+    if (m_Rotation.x > pitchLimit)
+        m_Rotation.x = pitchLimit;
+    if (m_Rotation.x < -pitchLimit)
+        m_Rotation.x = -pitchLimit;
+
     float t = 0.1f;
     m_Target = m_Target * (1.0f - t) + (playerPos + Vector3(0.0f, 2.0f, 0.0f)) * t;
 
@@ -33,9 +45,14 @@ void  Camera::Update()
     m_ShakeTime += dt;
     m_Shake *= 0.9;
 
-    m_Position = m_Target + Vector3(-sinf(m_Rotation.y) * 10.0f,
-        2.0f,
-        -cosf(m_Rotation.y) * 10.0f);
+    //m_Position = m_Target + Vector3(-sinf(m_Rotation.y) * 5.0f,
+    //    2.0f,
+    //    -cosf(m_Rotation.y) * 5.0f);
+
+    m_Position = m_Target + Vector3(
+        -sinf(m_Rotation.y) * cosf(m_Rotation.x) * 5.0f,
+        2.0f + sinf(m_Rotation.x) * 5.0f,
+        -cosf(m_Rotation.y) * cosf(m_Rotation.x) * 5.0f);
 }
 void  Camera::Draw()
 {
