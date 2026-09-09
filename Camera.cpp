@@ -8,56 +8,43 @@
 void Camera::Init()
 {
     m_Layer = 0;
-	m_Position = { 0.0f, 1.0f, -5.0f };
+    m_Target.x = 4.0f;                   // camera initially looks this far right of spawn
+    m_Position = { 4.0f, 3.0f, -7.0f };  // match m_Target.x so there's no snap on frame 1
 }
 void Camera::Uninit()
 {
 
 }
-void  Camera::Update()
+void Camera::Update()
 {
     Player* player = Manager::GetGameObj<Player>();
     Vector3 playerPos = player->GetPosition();
 
-    float dt = 1.0 / 60.0f;
-
-    if (Input::GetKeyPress(VK_RIGHT))
-        m_Rotation.y += 3.0f * dt;
-    if (Input::GetKeyPress(VK_LEFT))
-        m_Rotation.y -= 3.0f * dt;
-
-    if (Input::GetKeyPress(VK_UP))
-        m_Rotation.x += 3.0f * dt;
-    if (Input::GetKeyPress(VK_DOWN))
-        m_Rotation.x -= 3.0f * dt;
-
-    // clamp pitch so the orbit can't flip past straight up/down
-    const float pitchLimit = 1.2f; // ~68 degrees
-    if (m_Rotation.x > pitchLimit)
-        m_Rotation.x = pitchLimit;
-    if (m_Rotation.x < -pitchLimit)
-        m_Rotation.x = -pitchLimit;
-
+    float dt = 1.0f / 60.0f;
     float t = 0.1f;
-    m_Target = m_Target * (1.0f - t) + (playerPos + Vector3(0.0f, 2.0f, 0.0f)) * t;
+
+    // Y and Z follow the player normally (smoothed both directions).
+    m_Target.y = m_Target.y * (1.0f - t) + (playerPos.y + 2.0f) * t;
+    m_Target.z = m_Target.z * (1.0f - t) + playerPos.z * t;
+
+    // X only ever catches up when the player has moved far enough right
+    // to need it - the camera never scrolls back left. Player starts
+    // left-of-center and the camera stays put until they walk past it.
+
+        m_Target.x = m_Target.x * (1.0f - t) + playerPos.x * t;
 
     m_Target += m_Shake * cosf(m_ShakeTime * 100.0f);
     m_ShakeTime += dt;
-    m_Shake *= 0.9;
+    m_Shake *= 0.9f;
 
-    //m_Position = m_Target + Vector3(-sinf(m_Rotation.y) * 5.0f,
-    //    2.0f,
-    //    -cosf(m_Rotation.y) * 5.0f);
-
-    m_Position = m_Target + Vector3(
-        -sinf(m_Rotation.y) * cosf(m_Rotation.x) * 5.0f,
-        2.0f + sinf(m_Rotation.x) * 5.0f,
-        -cosf(m_Rotation.y) * cosf(m_Rotation.x) * 5.0f);
+    m_Position.x = m_Target.x;
+    m_Position.y = m_Target.y + 1.0f;
+    m_Position.z = m_Target.z - 7.0f;
 }
 void  Camera::Draw()
 {
     // プロジェクションマトリクス
-    XMMATRIX projection = XMMatrixPerspectiveFovLH(1.0f,
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(1.1f,
         (float)SCREEN_WIDTH / SCREEN_HEIGHT, 1.0f, 1000.0f);
 
     Renderer::SetProjectionMatrix(projection);

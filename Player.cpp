@@ -91,36 +91,19 @@ void Player::Update()
     bool oldGround = m_Ground;
     m_Ground = false;
 
-    Camera* camera = Manager::GetGameObj<Camera>();
-    Vector3 forward = camera->GetFoward();
-    Vector3 right = camera->GetRight();
-
-    forward.y = 0.0f;
-    forward.normalize();
-
-    right.y = 0.0f;
-    right.normalize();
-
+    // 2.5D side-scroll movement: only left/right along world X - no
+    // depth/forward-back input, since the camera no longer rotates to
+    // face any other direction.
     bool move = false;
 
     if (Input::GetKeyPress('D'))
     {
-        m_Velocity += right * (50.0f * dt);
+        m_Velocity.x += 50.0f * dt;
         move = true;
     }
     if (Input::GetKeyPress('A'))
     {
-        m_Velocity -= right * (50.0f * dt);
-        move = true;
-    }
-    if (Input::GetKeyPress('W'))
-    {
-        m_Velocity += forward * (50.0f * dt);
-        move = true;
-    }
-    if (Input::GetKeyPress('S'))
-    {
-        m_Velocity -= forward * (50.0f * dt);
+        m_Velocity.x -= 50.0f * dt;
         move = true;
     }
 
@@ -287,6 +270,11 @@ void Player::Update()
         //m_MoveAnimation += VectorMag(m_Velocity) * dt;
         //m_Scale.y += sinf(m_MoveAnimation * 3.0f) * 0.03f;
     }
+
+    // keep the player pinned to the scrolling plane - collision push-out
+    // from trees/boxes/enemies (which resolve in X/Z) could otherwise
+    // drift the player off Z=0 over time.
+    m_Position.z = 0.0f;
 
     Vector3 shadowPos = m_Position;
     shadowPos.y = 0.01f;

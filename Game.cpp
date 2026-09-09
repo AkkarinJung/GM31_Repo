@@ -34,7 +34,7 @@ void Game::Init()
 
 	Manager::AddGameObj<Player>();
 
-	Manager::AddGameObj<Enemy>()->SetPosition({ -2.0f,0.0f,1.0f });
+	/*Manager::AddGameObj<Enemy>()->SetPosition({ -2.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 0.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 2.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 2.0f,0.0f,1.0f });
@@ -45,7 +45,7 @@ void Game::Init()
 	Manager::AddGameObj<Enemy>()->SetPosition({ 7.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 8.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 9.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f,-1.0f,1.0f });
+	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f,-1.0f,1.0f });*/
 	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f,1.0f,1.0f });
 
 
