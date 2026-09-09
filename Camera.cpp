@@ -33,9 +33,9 @@ void  Camera::Update()
     m_ShakeTime += dt;
     m_Shake *= 0.9;
 
-    m_Position = m_Target + Vector3(-sinf(m_Rotation.y) * 5.0f,
+    m_Position = m_Target + Vector3(-sinf(m_Rotation.y) * 10.0f,
         2.0f,
-        -cosf(m_Rotation.y) * 5.0f);
+        -cosf(m_Rotation.y) * 10.0f);
 }
 void  Camera::Draw()
 {

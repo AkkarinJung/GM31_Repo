@@ -29,8 +29,8 @@ void Enemy::Init()
     m_ModelRenderer->Load("asset\\model\\Rabbit\\rabbit_1.obj");
 
 
-    Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\litTextureVS.cso");
-    Renderer::CreatePixelShader(&m_PixelShader, "shader\\litTexturePS.cso");
+    Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\unlitTextureVS.cso");
+    Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");
 
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 1.5f ,1.5f ,1.5f });

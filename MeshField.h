@@ -17,9 +17,13 @@ private:
 
 	ID3D11ShaderResourceView* m_Texture;
 
+	VERTEX_3D m_Vertex[21][21];
+
 public:
 	void Init();
 	void Uninit();
 	void Update();
 	void Draw();
+
+	float GetHeight(Vector3 Position);
 };

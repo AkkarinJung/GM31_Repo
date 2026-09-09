@@ -208,16 +208,16 @@
     <FxCompile Include="shader\unlitTextureVS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="shader\litTextureVS.hlsl">
+    <FxCompile Include="shader\FieldPS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\FieldVS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
     <FxCompile Include="shader\litTexturePS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="shader\FieldPS.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="shader\FieldVS.hlsl">
+    <FxCompile Include="shader\litTextureVS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>

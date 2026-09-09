@@ -16,6 +16,7 @@
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
+#include "MeshField.h"
 
 void Player::Init()
 {
@@ -145,10 +146,12 @@ void Player::Update()
     
     m_Position += m_Velocity * dt;
    
-   
-    if (m_Position.y < 0.0f)
+    MeshField* meshField = Manager::GetGameObj<MeshField>();
+    float height = meshField->GetHeight(m_Position);
+
+    if (m_Position.y < height)
     {
-        m_Position.y = 0.0f;
+        m_Position.y = height;
         m_Velocity.y = 0.0f;
         m_Ground = true;
     }
