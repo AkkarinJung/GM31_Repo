@@ -27,13 +27,12 @@ void Player::Init()
     m_Position = { 0.0f, 0.0f, 0.0f };
     m_Scale = { 0.01f, 0.01f, 0.01f };
 
-
     //ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
     //m_ModelRenderer->Load("asset\\model\\player.obj");
     m_AnimationModel = AddGameComponent<AnimationModel>(this);
-    m_AnimationModel->Load("asset\\model\\Akai.fbx");
-    m_AnimationModel->LoadAnimation("asset\\model\\Akai_Idle.fbx", "Idle");
-    m_AnimationModel->LoadAnimation("asset\\model\\Akai_Run.fbx", "Run");
+    m_AnimationModel->Load("asset\\model\\Standing_Walk_Forward.fbx");
+    m_AnimationModel->LoadAnimation("asset\\model\\Standing_Walk_Forward.fbx", "Idle");
+    m_AnimationModel->LoadAnimation("asset\\model\\Standing_Walk_Forward.fbx", "Run");
     m_AnimationModel->DebugPrintBoneNames();
 
     m_AnimationName = "Idle";
