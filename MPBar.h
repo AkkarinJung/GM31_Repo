@@ -1,11 +1,10 @@
 #pragma once
 #include "GameObject.h"
 
-// Screen-space HP bar: a static background quad plus a fill quad that
-// shrinks left-to-right based on Target's Stats component. Reusable for
-// Player, Enemy, or anything else with a Stats component - just pass a
-// different Target and fill texture.
-class HPBar : public GameObject
+// Screen-space MP bar - identical in structure to HPBar, but reads
+// Target's Stats MP instead of HP. Reusable for anything with a Stats
+// component that spends MP.
+class MPBar : public GameObject
 {
 private:
     float m_X = 0.0f, m_Y = 0.0f, m_Width = 0.0f, m_Height = 0.0f;
@@ -22,7 +21,7 @@ private:
     ID3D11ShaderResourceView* m_BackgroundTexture = nullptr;
     ID3D11ShaderResourceView* m_FillTexture = nullptr;
 
-    float m_DisplayRatio = 1.0f; // eases toward the real HP ratio each frame
+    float m_DisplayRatio = 1.0f; // eases toward the real MP ratio each frame
 
 public:
     void Init() override {}

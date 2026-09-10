@@ -23,6 +23,7 @@
 #include "Result.h"
 
 #include "HPBar.h"
+#include "MPBar.h"
 
 
 void Game::Init()
@@ -89,6 +90,7 @@ void Game::Init()
 
 	Manager::AddGameObj<Score>()->SetPosition({ 100.0f,100.0f,0.0f });
 	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
+	Manager::AddGameObj<MPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
 }
 
 

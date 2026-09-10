@@ -1,9 +1,9 @@
 #include "main.h"
 #include "renderer.h"
-#include "HPBar.h"
+#include "MPBar.h"
 #include "Stats.h"
 
-void HPBar::Init(float X, float Y, float Width, float Height, GameObject* Target, const WCHAR* FillTextureName)
+void MPBar::Init(float X, float Y, float Width, float Height, GameObject* Target, const WCHAR* FillTextureName)
 {
     m_Layer = 4;
     m_X = X;
@@ -44,7 +44,7 @@ void HPBar::Init(float X, float Y, float Width, float Height, GameObject* Target
 
     Renderer::GetDevice()->CreateBuffer(&bgDesc, &bgData, &m_BackgroundVertexBuffer);
 
-    // fill quad is dynamic - remapped every frame based on the HP ratio
+    // fill quad is dynamic - remapped every frame based on the MP ratio
     D3D11_BUFFER_DESC fillDesc{};
     fillDesc.Usage = D3D11_USAGE_DYNAMIC;
     fillDesc.ByteWidth = sizeof(VERTEX_3D) * 4;
@@ -77,12 +77,12 @@ void HPBar::Init(float X, float Y, float Width, float Height, GameObject* Target
 
     float ratio = 1.0f;
     Stats* stats = m_Target != nullptr ? m_Target->GetGameComponent<Stats>() : nullptr;
-    if (stats != nullptr && stats->GetMaxHP() > 0)
-        ratio = (float)stats->GetHP() / (float)stats->GetMaxHP();
+    if (stats != nullptr && stats->GetMaxMP() > 0)
+        ratio = (float)stats->GetMP() / (float)stats->GetMaxMP();
     m_DisplayRatio = ratio;
 }
 
-void HPBar::Uninit()
+void MPBar::Uninit()
 {
     m_BackgroundVertexBuffer->Release();
     m_FillVertexBuffer->Release();
@@ -92,14 +92,14 @@ void HPBar::Uninit()
     m_PixelShader->Release();
 }
 
-void HPBar::Update()
+void MPBar::Update()
 {
     float targetRatio = 1.0f;
     if (m_Target != nullptr)
     {
         Stats* stats = m_Target->GetGameComponent<Stats>();
-        if (stats != nullptr && stats->GetMaxHP() > 0)
-            targetRatio = (float)stats->GetHP() / (float)stats->GetMaxHP();
+        if (stats != nullptr && stats->GetMaxMP() > 0)
+            targetRatio = (float)stats->GetMP() / (float)stats->GetMaxMP();
     }
     if (targetRatio < 0.0f) targetRatio = 0.0f;
     if (targetRatio > 1.0f) targetRatio = 1.0f;
@@ -120,7 +120,7 @@ void HPBar::Update()
     }
 }
 
-void HPBar::Draw()
+void MPBar::Draw()
 {
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
@@ -144,7 +144,7 @@ void HPBar::Draw()
     Renderer::GetDeviceContext()->Draw(4, 0);
 
     // fill - width scaled by the eased display ratio (see Update()),
-    // not the raw HP, so a change animates instead of cutting off
+    // not the raw MP, so a change animates instead of cutting off
     float ratio = m_DisplayRatio;
 
     // the bar art itself (a slanted parallelogram) only occupies the

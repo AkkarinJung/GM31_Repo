@@ -37,6 +37,7 @@
     <ClCompile Include="manager.cpp" />
     <ClCompile Include="MeshField.cpp" />
     <ClCompile Include="modelRenderer.cpp" />
+    <ClCompile Include="MPBar.cpp" />
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Polygon2D.cpp" />
@@ -73,6 +74,7 @@
     <ClInclude Include="manager.h" />
     <ClInclude Include="MeshField.h" />
     <ClInclude Include="modelRenderer.h" />
+    <ClInclude Include="MPBar.h" />
     <ClInclude Include="Particle.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Polygon2D.h" />
