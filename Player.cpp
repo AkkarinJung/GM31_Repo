@@ -30,9 +30,9 @@ void Player::Init()
     //ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
     //m_ModelRenderer->Load("asset\\model\\player.obj");
     m_AnimationModel = AddGameComponent<AnimationModel>(this);
-    m_AnimationModel->Load("asset\\model\\Standing_Walk_Forward.fbx");
-    m_AnimationModel->LoadAnimation("asset\\model\\Standing_Walk_Forward.fbx", "Idle");
-    m_AnimationModel->LoadAnimation("asset\\model\\Standing_Walk_Forward.fbx", "Run");
+    m_AnimationModel->Load("asset\\model\\Player_Movement\\Idle_model.fbx");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Idle_model.fbx", "Idle");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Run.fbx", "Run");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Jump.fbx", "Jump");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_1.fbx", "Attack1");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_2.fbx", "Attack2");
@@ -148,26 +148,26 @@ void Player::Update()
 
     if (m_Attacking)
     {
-        if (Input::GetKeyPress('H')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].x -= tuneStep;
-        if (Input::GetKeyPress('K')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].x += tuneStep;
-        if (Input::GetKeyPress('N')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].y -= tuneStep;
-        if (Input::GetKeyPress('U')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].y += tuneStep;
-        if (Input::GetKeyPress('G')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].z -= tuneStep;
-        if (Input::GetKeyPress('T')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].z += tuneStep;
+        Vector3& tuningPos = m_UsingRightAttack ? m_RightAttackOffsetPos[m_TuningKeyframeIndex] : m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex];
+        Vector3& tuningRot = m_UsingRightAttack ? m_RightAttackOffsetRot[m_TuningKeyframeIndex] : m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex];
 
-        if (Input::GetKeyPress('Z')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].x -= tuneRotStep;
-        if (Input::GetKeyPress('X')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].x += tuneRotStep;
-        if (Input::GetKeyPress('C')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].y -= tuneRotStep;
-        if (Input::GetKeyPress('V')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].y += tuneRotStep;
-        if (Input::GetKeyPress('B')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].z -= tuneRotStep;
-        if (Input::GetKeyPress('M')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].z += tuneRotStep;
+        if (Input::GetKeyPress('H')) tuningPos.x -= tuneStep;
+        if (Input::GetKeyPress('K')) tuningPos.x += tuneStep;
+        if (Input::GetKeyPress('N')) tuningPos.y -= tuneStep;
+        if (Input::GetKeyPress('U')) tuningPos.y += tuneStep;
+        if (Input::GetKeyPress('G')) tuningPos.z -= tuneStep;
+        if (Input::GetKeyPress('T')) tuningPos.z += tuneStep;
+
+        if (Input::GetKeyPress('Z')) tuningRot.x -= tuneRotStep;
+        if (Input::GetKeyPress('X')) tuningRot.x += tuneRotStep;
+        if (Input::GetKeyPress('C')) tuningRot.y -= tuneRotStep;
+        if (Input::GetKeyPress('V')) tuningRot.y += tuneRotStep;
+        if (Input::GetKeyPress('B')) tuningRot.z -= tuneRotStep;
+        if (Input::GetKeyPress('M')) tuningRot.z += tuneRotStep;
 
         if (m_FreezeAnimation)
         {
-            m_WeaponSocket->SetLocalTransform(
-                m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex],
-                m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex],
-                { 1.0f, 1.0f, 1.0f });
+            m_WeaponSocket->SetLocalTransform(tuningPos, tuningRot, { 1.0f, 1.0f, 1.0f });
         }
     }
     else
@@ -305,7 +305,7 @@ void Player::Update()
     //    m_Scale.z = 2.0f;
     //}
 
-    if (Input::GetKeyTrigger('J'))
+    if (Input::GetKeyTrigger(VK_LBUTTON))
     {
         if (m_Attacking)
             m_AttackQueued = true;   // current swing is still playing - buffer this press
@@ -313,11 +313,17 @@ void Player::Update()
             StartAttack();
     }
 
+    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_Attacking)
+    {
+        StartRightAttack();
+    }
+
     // Attacks take priority and run to completion; once done (or if not
     // attacking), fall back to Jump (while airborne) or Run/Idle.
     if (m_Attacking && m_NextAnimationFrame >= m_AttackAnimLength)
     {
         m_Attacking = false;
+        m_UsingRightAttack = false;
         m_WeaponSocket->SetLocalTransform(m_IdleWeaponOffsetPos, m_IdleWeaponOffsetRot, { 1.0f, 1.0f, 1.0f });
 
         if (m_AttackQueued)
@@ -450,8 +456,11 @@ void Player::UpdateAttackWeaponOffset()
     int segment = (progress < 0.5f) ? 0 : 1;
     float localT = (segment == 0) ? (progress / 0.5f) : ((progress - 0.5f) / 0.5f);
 
-    Vector3 pos = m_AttackOffsetPos[m_AttackCombo][segment] * (1.0f - localT) + m_AttackOffsetPos[m_AttackCombo][segment + 1] * localT;
-    Vector3 rot = SlerpRotation(m_AttackOffsetRot[m_AttackCombo][segment], m_AttackOffsetRot[m_AttackCombo][segment + 1], localT);
+    Vector3* posArray = m_UsingRightAttack ? m_RightAttackOffsetPos : m_AttackOffsetPos[m_AttackCombo];
+    Vector3* rotArray = m_UsingRightAttack ? m_RightAttackOffsetRot : m_AttackOffsetRot[m_AttackCombo];
+
+    Vector3 pos = posArray[segment] * (1.0f - localT) + posArray[segment + 1] * localT;
+    Vector3 rot = SlerpRotation(rotArray[segment], rotArray[segment + 1], localT);
 
     m_WeaponSocket->SetLocalTransform(pos, rot, { 1.0f, 1.0f, 1.0f });
 }
@@ -508,4 +517,20 @@ void Player::StartAttack()
     // always the pure attack animation from frame 0,
     // matching exactly what was tuned - consistent
     // regardless of what animation played before it.
+}
+
+void Player::StartRightAttack()
+{
+    if (!m_Stats->TrySpendMP(m_RightAttackMPCost))
+        return; // not enough MP - attack doesn't trigger
+
+    m_Weapon->Use(this);
+
+    m_UsingRightAttack = true;
+    m_Attacking = true;
+
+    SetAnimation("AttackRight");
+    m_AttackAnimLength = m_AnimationModel->GetAnimationFrameCount("AttackRight");
+
+    m_Blend = 0.7f;
 }

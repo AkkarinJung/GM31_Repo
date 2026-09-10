@@ -77,15 +77,28 @@ private:
     //    // Attack3
     //    { { 5.6000f, -9.2333f, -1.9000f }, { -4.0666f, -7.9334f, -4.5000f }, { -11.1000f, 1.3333f, -1.3000f } }
     //};
+
     int m_TuningKeyframeIndex = 0; // which of the 3 keyframes the tuning keys currently edit
 
     float m_ComboResetTimer = 999.0f; // starts "expired" so the very first attack begins at Attack1
     const float m_ComboWindow = 0.6f; // seconds allowed between attacks to keep the combo going
 
     bool m_AttackQueued = false;
-    void StartAttack();
 
+    //Right attack
+    bool m_UsingRightAttack = false;
+    int m_RightAttackMPCost = 15;
+
+    Vector3 m_RightAttackOffsetPos[3]{
+       { 0.0000f, 0.0000f, 0.0000f }, { 0.0000f, 0.0000f, 0.0000f }, { 0.0000f,0.0000f,0.0000f }
+    };
+    Vector3 m_RightAttackOffsetRot[3]{
+       { 0.0000f, 0.0000f, 0.0000f }, { 0.0000f, 0.0000f, 0.0000f }, { 0.0000f, 0.0000f,0.0000f }
+    };
+
+    void StartAttack();
     void UpdateAttackWeaponOffset();
+    void StartRightAttack();
 
 public:
     void Init() override;

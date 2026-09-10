@@ -10,6 +10,8 @@ class Stats : public Component
 private:
     int m_MaxHP = 100;
     int m_HP = 100;
+    int m_MaxMP = 50;
+    int m_MP = 50;
     int m_Attack = 10;
     int m_Defense = 0;
 
@@ -18,10 +20,14 @@ public:
 
     int GetHP() const { return m_HP; }
     int GetMaxHP() const { return m_MaxHP; }
+    int GetMP() const { return m_MP; }
+    int GetMaxMP() const { return m_MaxMP; }
     int GetAttack() const { return m_Attack; }
     int GetDefense() const { return m_Defense; }
 
     void SetMaxHP(int MaxHP) { m_MaxHP = MaxHP; m_HP = MaxHP; }
+    void SetMaxMP(int MaxMP) { m_MaxMP = MaxMP; m_MP = MaxMP; }
+
     void SetAttack(int Attack) { m_Attack = Attack; }
     void SetDefense(int Defense) { m_Defense = Defense; }
 
@@ -43,5 +49,21 @@ public:
         m_HP += Amount;
         if (m_HP > m_MaxHP)
             m_HP = m_MaxHP;
+    }
+
+    bool TrySpendMP(int Amount)
+    {
+        if (m_MP < Amount)
+            return false;
+
+        m_MP -= Amount;
+        return true;
+    }
+
+    void RestoreMP(int Amount)
+    {
+        m_MP += Amount;
+        if (m_MP > m_MaxMP)
+            m_MP = m_MaxMP;
     }
 };
