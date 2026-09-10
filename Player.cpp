@@ -6,8 +6,6 @@
 #include "input.h"
 #include "Collision.h"
 
-#include "Bullet.h"
-
 #include "Manager.h"
 #include "Camera.h"
 #include "audio.h"
@@ -18,8 +16,10 @@
 #include "Shadow.h"
 #include "MeshField.h"
 
+#include "Stats.h"
+
 #include "BoneAttachPoint.h"
-#include "Sword.h"   
+#include "Sword.h"
 
 void Player::Init()
 {
@@ -33,17 +33,19 @@ void Player::Init()
     m_AnimationModel->Load("asset\\model\\Standing_Walk_Forward.fbx");
     m_AnimationModel->LoadAnimation("asset\\model\\Standing_Walk_Forward.fbx", "Idle");
     m_AnimationModel->LoadAnimation("asset\\model\\Standing_Walk_Forward.fbx", "Run");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Jump.fbx", "Jump");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_1.fbx", "Attack1");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_2.fbx", "Attack2");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_3.fbx", "Attack3");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_Right.fbx", "AttackRight");
     m_AnimationModel->DebugPrintBoneNames();
 
     m_AnimationName = "Idle";
     m_NextAnimationName = "Idle";
 
     m_WeaponSocket = AddGameComponent<BoneAttachPoint>(this);
-    m_WeaponSocket->SetBone(m_AnimationModel, "mixamorig:LeftHand");
-    m_WeaponSocket->SetLocalTransform(
-        { 8.6667f, 4.0f, -6.6667f },   // <-- this is the position offset, currently zero
-        { 10.0f,-0.36f, 0.0f },   // rotation offset
-        { 1.0f, 1.0f, 1.0f }); // scale (or whatever you landed on)
+    m_WeaponSocket->SetBone(m_AnimationModel, "mixamorig:RightHand");
+    m_WeaponSocket->SetLocalTransform(m_IdleWeaponOffsetPos, m_IdleWeaponOffsetRot, { 1.0f, 1.0f, 1.0f });
     m_Weapon = Manager::AddGameObj<Sword>();
     m_WeaponSocket->Attach(m_Weapon);
 
@@ -66,6 +68,11 @@ void Player::Init()
     //childModel->Load("asset\\model\\Rabbit\\rabbit_1.obj");
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 1.5f ,1.5f ,1.5f });
+
+    m_Stats = AddGameComponent<Stats>(this);
+    m_Stats->SetMaxHP(100);
+    m_Stats->SetAttack(5); // base unarmed attack - weapons add on top of this
+    m_Stats->SetDefense(2);
 }
 
 void Player::Uninit()
@@ -79,66 +86,110 @@ void Player::Uninit()
 
 void Player::Update()
 {
+    if (Input::GetKeyTrigger('1'))
+    {
+        m_TuningKeyframeIndex = 0;
+        if (m_Attacking) { m_NextAnimationFrame = 0; m_Blend = 1.0f; }
+    }
+    if (Input::GetKeyTrigger('2'))
+    {
+        m_TuningKeyframeIndex = 1;
+        if (m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength / 2; m_Blend = 1.0f; }
+    }
+    if (Input::GetKeyTrigger('3'))
+    {
+        m_TuningKeyframeIndex = 2;
+        if (m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength - 1; m_Blend = 1.0f; }
+    }
+
+    if (Input::GetKeyTrigger(VK_F2))
+        m_FreezeAnimation = !m_FreezeAnimation;
+
+    if (m_FreezeAnimation && Input::GetKeyTrigger(VK_F3))
+    {
+        m_AnimationFrame++;
+        m_NextAnimationFrame++;
+    }
 
     Vector3 oldPosition = m_Position;
     float dt = 1.0 / 60.0f;
 
-    Vector3 rot = m_Child->GetRotation();
-    rot.y += 1.0f * dt;
-    m_Child->SetRotation(rot);
+    if (Input::GetKeyTrigger(VK_F4))
+        DebugDumpSwing("Attack1", "mixamorig:RightHand");
+
+    //Vector3 rot = m_Child->GetRotation();
+    //rot.y += 1.0f * dt;
+    //m_Child->SetRotation(rot);
 
     bool oldGround = m_Ground;
     m_Ground = false;
 
     // 2.5D side-scroll movement: only left/right along world X - no
     // depth/forward-back input, since the camera no longer rotates to
-    // face any other direction.
+    // face any other direction. Locked out while attacking.
     bool move = false;
 
-    if (Input::GetKeyPress('D'))
+    if (!m_Attacking)
     {
-        m_Velocity.x += 50.0f * dt;
-        move = true;
+        if (Input::GetKeyPress('D'))
+        {
+            m_Velocity.x += 50.0f * dt;
+            move = true;
+        }
+        if (Input::GetKeyPress('A'))
+        {
+            m_Velocity.x -= 50.0f * dt;
+            move = true;
+        }
     }
-    if (Input::GetKeyPress('A'))
+
+    float tuneStep = 20.0f * dt;
+    float tuneRotStep = 2.0f * dt;
+
+    if (m_Attacking)
     {
-        m_Velocity.x -= 50.0f * dt;
-        move = true;
+        if (Input::GetKeyPress('H')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].x -= tuneStep;
+        if (Input::GetKeyPress('K')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].x += tuneStep;
+        if (Input::GetKeyPress('N')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].y -= tuneStep;
+        if (Input::GetKeyPress('U')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].y += tuneStep;
+        if (Input::GetKeyPress('G')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].z -= tuneStep;
+        if (Input::GetKeyPress('T')) m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex].z += tuneStep;
+
+        if (Input::GetKeyPress('Z')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].x -= tuneRotStep;
+        if (Input::GetKeyPress('X')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].x += tuneRotStep;
+        if (Input::GetKeyPress('C')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].y -= tuneRotStep;
+        if (Input::GetKeyPress('V')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].y += tuneRotStep;
+        if (Input::GetKeyPress('B')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].z -= tuneRotStep;
+        if (Input::GetKeyPress('M')) m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex].z += tuneRotStep;
+
+        if (m_FreezeAnimation)
+        {
+            m_WeaponSocket->SetLocalTransform(
+                m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex],
+                m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex],
+                { 1.0f, 1.0f, 1.0f });
+        }
     }
-
-    // --- temporary sword offset tuning - remove once satisfied ---
-    float tuneStep = 20.0f * dt;    // position, raw model-space units/sec
-    float tuneRotStep = 2.0f * dt;  // rotation, radians/sec
-
-    if (Input::GetKeyPress('H')) m_WeaponSocket->AdjustLocalPosition({ -tuneStep, 0.0f, 0.0f });
-    if (Input::GetKeyPress('K')) m_WeaponSocket->AdjustLocalPosition({ tuneStep, 0.0f, 0.0f });
-
-    if (Input::GetKeyPress('N')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, -tuneStep, 0.0f });
-    if (Input::GetKeyPress('U')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, tuneStep, 0.0f });
-
-    if (Input::GetKeyPress('G')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, -tuneStep });
-    if (Input::GetKeyPress('T')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, tuneStep });
-
-    if (Input::GetKeyPress('Z')) m_WeaponSocket->AdjustLocalRotation({ -tuneRotStep, 0.0f, 0.0f });
-    if (Input::GetKeyPress('X')) m_WeaponSocket->AdjustLocalRotation({ tuneRotStep, 0.0f, 0.0f });
-    if (Input::GetKeyPress('C')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, -tuneRotStep, 0.0f });
-    if (Input::GetKeyPress('V')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, tuneRotStep, 0.0f });
-    if (Input::GetKeyPress('B')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, -tuneRotStep });
-    if (Input::GetKeyPress('M')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, tuneRotStep });
+    else
+    {
+        if (Input::GetKeyPress('H')) m_WeaponSocket->AdjustLocalPosition({ -tuneStep, 0.0f, 0.0f });
+        if (Input::GetKeyPress('K')) m_WeaponSocket->AdjustLocalPosition({ tuneStep, 0.0f, 0.0f });
+        if (Input::GetKeyPress('N')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, -tuneStep, 0.0f });
+        if (Input::GetKeyPress('U')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, tuneStep, 0.0f });
+        if (Input::GetKeyPress('G')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, -tuneStep });
+        if (Input::GetKeyPress('T')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, tuneStep });
+        if (Input::GetKeyPress('Z')) m_WeaponSocket->AdjustLocalRotation({ -tuneRotStep, 0.0f, 0.0f });
+        if (Input::GetKeyPress('X')) m_WeaponSocket->AdjustLocalRotation({ tuneRotStep, 0.0f, 0.0f });
+        if (Input::GetKeyPress('C')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, -tuneRotStep, 0.0f });
+        if (Input::GetKeyPress('V')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, tuneRotStep, 0.0f });
+        if (Input::GetKeyPress('B')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, -tuneRotStep });
+        if (Input::GetKeyPress('M')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, tuneRotStep });
+    }
 
     if (Input::GetKeyTrigger('P'))
         m_WeaponSocket->DebugPrintTransform();
 
-    if (move)
-    {
-        SetAnimation("Run");
-    }
-    else
-    {
-        SetAnimation("Idle");
-    }
-
-    m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z); 
+    m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
 
     if (Input::GetKeyTrigger(VK_SPACE))
     {
@@ -161,9 +212,8 @@ void Player::Update()
     m_Velocity.x += -m_Velocity.x * 5.0f * dt;
     m_Velocity.z += -m_Velocity.z * 5.0f * dt;
 
-    
     m_Position += m_Velocity * dt;
-   
+
     MeshField* meshField = Manager::GetGameObj<MeshField>();
     float height = meshField->GetHeight(m_Position);
 
@@ -175,7 +225,7 @@ void Player::Update()
     }
 
     auto trees = Manager::GetGameObjs<Tree>();
-    for(auto tree : trees)
+    for (auto tree : trees)
     {
         Vector3 treePos = tree->GetPosition();
         Vector3 playerPos = m_Position;
@@ -257,13 +307,31 @@ void Player::Update()
 
     if (Input::GetKeyTrigger('J'))
     {
-        //Bullet* bullet = Manager::AddGameObj<Bullet>();
-        //bullet->SetPosition(m_Position);
-        //bullet->SetVelocity(GetFoward() * 20.0f);
-
-        m_Weapon->Use(this);
+        if (m_Attacking)
+            m_AttackQueued = true;   // current swing is still playing - buffer this press
+        else
+            StartAttack();
     }
-    
+
+    // Attacks take priority and run to completion; once done (or if not
+    // attacking), fall back to Jump (while airborne) or Run/Idle.
+    if (m_Attacking && m_NextAnimationFrame >= m_AttackAnimLength)
+    {
+        m_Attacking = false;
+        m_WeaponSocket->SetLocalTransform(m_IdleWeaponOffsetPos, m_IdleWeaponOffsetRot, { 1.0f, 1.0f, 1.0f });
+
+        if (m_AttackQueued)
+        {
+            m_AttackQueued = false;
+            StartAttack();
+        }
+    }
+
+    if (!m_Attacking)
+    {
+        m_ComboResetTimer += dt;
+    }
+
     if (m_Ground)
     {
         //m_MoveAnimation += VectorMag(m_Velocity) * dt;
@@ -279,11 +347,35 @@ void Player::Update()
     shadowPos.y = 0.01f;
     m_Shadow->SetPosition(shadowPos);
 
-    m_AnimationFrame++;
-    m_NextAnimationFrame++;
-    m_Blend += 0.1f;
-    if (m_Blend > 1.0f)
-        m_Blend = 1.0f;
+    if (m_Attacking && !m_FreezeAnimation)
+    {
+        UpdateAttackWeaponOffset();
+    }
+
+    if (!m_Attacking)
+    {
+        if (!m_Ground)
+        {
+            SetAnimation("Jump");
+        }
+        else if (move)
+        {
+            SetAnimation("Run");
+        }
+        else
+        {
+            SetAnimation("Idle");
+        }
+    }
+
+    if (!m_FreezeAnimation)
+    {
+        m_AnimationFrame++;
+        m_NextAnimationFrame++;
+        m_Blend += 0.1f;
+        if (m_Blend > 1.0f)
+            m_Blend = 1.0f;
+    }
 
     m_AnimationModel->Update(m_AnimationName.c_str(), m_AnimationFrame, m_NextAnimationName.c_str(), m_NextAnimationFrame, m_Blend);
 
@@ -316,5 +408,104 @@ void Player::SetAnimation(const char* AnimationName)
     }
 }
 
+void Player::DebugDumpSwing(const char* AnimationName, const char* BoneName)
+{
+    int frameCount = m_AnimationModel->GetAnimationFrameCount(AnimationName);
 
+    char buffer[256];
+    sprintf_s(buffer, "=== %s / %s (%d frames) ===\n", AnimationName, BoneName, frameCount);
+    OutputDebugStringA(buffer);
 
+    for (int f = 0; f < frameCount; f++)
+    {
+        m_AnimationModel->Update(AnimationName, f, AnimationName, f, 1.0f);
+
+        XMMATRIX boneMatrix;
+        if (!m_AnimationModel->GetBoneMatrix(BoneName, &boneMatrix))
+            continue;
+
+        XMVECTOR scale, rotQuat, translation;
+        XMMatrixDecompose(&scale, &rotQuat, &translation, boneMatrix);
+
+        XMFLOAT3 pos;
+        XMStoreFloat3(&pos, translation);
+
+        XMFLOAT4 quat;
+        XMStoreFloat4(&quat, rotQuat);
+
+        sprintf_s(buffer, "frame %2d: pos(%.4f, %.4f, %.4f) quat(%.4f, %.4f, %.4f, %.4f)\n",
+            f, pos.x, pos.y, pos.z, quat.x, quat.y, quat.z, quat.w);
+        OutputDebugStringA(buffer);
+    }
+}
+
+void Player::UpdateAttackWeaponOffset()
+{
+    float progress = (m_AttackAnimLength > 0)
+        ? (float)m_NextAnimationFrame / (float)m_AttackAnimLength
+        : 0.0f;
+    if (progress > 1.0f)
+        progress = 1.0f;
+
+    int segment = (progress < 0.5f) ? 0 : 1;
+    float localT = (segment == 0) ? (progress / 0.5f) : ((progress - 0.5f) / 0.5f);
+
+    Vector3 pos = m_AttackOffsetPos[m_AttackCombo][segment] * (1.0f - localT) + m_AttackOffsetPos[m_AttackCombo][segment + 1] * localT;
+    Vector3 rot = SlerpRotation(m_AttackOffsetRot[m_AttackCombo][segment], m_AttackOffsetRot[m_AttackCombo][segment + 1], localT);
+
+    m_WeaponSocket->SetLocalTransform(pos, rot, { 1.0f, 1.0f, 1.0f });
+}
+
+Vector3 Player::SlerpRotation(const Vector3& RotA, const Vector3& RotB, float T)
+{
+    XMVECTOR qa = XMQuaternionRotationRollPitchYaw(RotA.x, RotA.y, RotA.z);
+    XMVECTOR qb = XMQuaternionRotationRollPitchYaw(RotB.x, RotB.y, RotB.z);
+
+    // shortest-path: if the two quaternions are on opposite hemispheres
+    // (same visual rotation, opposite sign), negate one so slerp takes
+    // the short way instead of spinning the long way around.
+    if (XMVectorGetX(XMQuaternionDot(qa, qb)) < 0.0f)
+        qb = XMVectorNegate(qb);
+
+    XMVECTOR result = XMQuaternionSlerp(qa, qb, T);
+
+    XMFLOAT4 q;
+    XMStoreFloat4(&q, result);
+
+    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
+    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+    float roll = atan2f(sinr_cosp, cosr_cosp);
+
+    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
+    float pitch = fabsf(sinp) >= 1.0f ? copysignf(XM_PIDIV2, sinp) : asinf(sinp);
+
+    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
+    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+    float yaw = atan2f(siny_cosp, cosy_cosp);
+
+    return { pitch, yaw, roll };
+}
+
+void Player::StartAttack()
+{
+    m_Weapon->Use(this);
+
+    m_AttackCombo = (m_ComboResetTimer > m_ComboWindow)
+        ? 0
+        : (m_AttackCombo + 1) % 3;
+
+    m_Attacking = true;
+    m_ComboResetTimer = 0.0f;
+
+    const char* attackAnim =
+        (m_AttackCombo == 0) ? "Attack1" :
+        (m_AttackCombo == 1) ? "Attack2" : "Attack3";
+
+    SetAnimation(attackAnim);
+    m_AttackAnimLength = m_AnimationModel->GetAnimationFrameCount(attackAnim);
+
+    m_Blend = 0.7f; // skip the idle/runÅ®attack crossfade so the pose is
+    // always the pure attack animation from frame 0,
+    // matching exactly what was tuned - consistent
+    // regardless of what animation played before it.
+}

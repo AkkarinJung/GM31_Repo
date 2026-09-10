@@ -31,6 +31,7 @@
     <ClCompile Include="field.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Grass.cpp" />
+    <ClCompile Include="HPBar.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manager.cpp" />
@@ -66,6 +67,7 @@
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Grass.h" />
+    <ClInclude Include="HPBar.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="manager.h" />
@@ -80,6 +82,7 @@
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="SkyDome.h" />
+    <ClInclude Include="Stats.h" />
     <ClInclude Include="Sword.h" />
     <ClInclude Include="Title.h" />
     <ClInclude Include="Tree.h" />

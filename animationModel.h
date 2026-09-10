@@ -58,4 +58,10 @@ public:
 	void Draw() override;
 	bool GetBoneMatrix(const std::string& BoneName, XMMATRIX* OutMatrix) const;
 	void DebugPrintBoneNames() const;
+
+	// number of keyframes in this clip's first channel - this engine
+	// treats "frame" as a raw keyframe index (see Update()), not a
+	// time-sampled duration, so this is how long a one-shot animation
+	// like an attack actually plays for before it should loop/end.
+	int GetAnimationFrameCount(const std::string& AnimationName) const;
 };

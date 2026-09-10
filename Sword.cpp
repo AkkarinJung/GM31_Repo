@@ -5,6 +5,7 @@
 #include "Enemy.h"
 #include "manager.h"
 #include "Collision.h"
+#include "Stats.h"
 
 void Sword::LoadModel()
 {
@@ -32,6 +33,9 @@ void Sword::Use(GameObject* Owner)
     forward.y = 0.0f;
     forward.normalize();
 
+    Stats* ownerStats = Owner->GetGameComponent<Stats>();
+    int attackPower = (int)m_Damage + (ownerStats != nullptr ? ownerStats->GetAttack() : 0);
+
     auto enemies = Manager::GetGameObjs<Enemy>();
     for (auto enemy : enemies)
     {
@@ -48,9 +52,14 @@ void Sword::Use(GameObject* Owner)
         toEnemy /= length;
 
         if (Vector3::dot(forward, toEnemy) < m_AngleDot)
-            continue; // outside the swing's front arc
+            continue;
 
-        enemy->AddDamage((int)m_Damage);
+        Stats* enemyStats = enemy->GetGameComponent<Stats>();
+        if (enemyStats != nullptr)
+            enemyStats->TakeDamage(attackPower);
+        else
+            enemy->AddDamage(attackPower); // Enemy hasn't been migrated to Stats yet
+
         enemy->Shake(forward * 0.3f);
     }
 }

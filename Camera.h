@@ -42,5 +42,8 @@ public:
 		m_ShakeTime = 0;
 	}
 
+private:
+	bool m_DebugMode = false;
+	void UpdateDebugCamera();
 };
 

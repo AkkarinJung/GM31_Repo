@@ -106,6 +106,18 @@ public:
 		return component;
 	}
 
+	template<typename T>
+	T* GetGameComponent()
+	{
+		for (Component* component : m_Components)
+		{
+			T* find = dynamic_cast<T*>(component);
+			if (find != nullptr)
+				return find;
+		}
+		return nullptr;
+	}
+
 	virtual Vector3 GetFoward()
 	{
 		XMMATRIX rot = XMMatrixRotationRollPitchYaw(m_Rotation.x, m_Rotation.y, m_Rotation.z);

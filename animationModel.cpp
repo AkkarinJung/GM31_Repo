@@ -315,6 +315,7 @@
 			int f;
 			aiQuaternion rot1;
 			aiVector3D pos1;
+			bool has1 = false;
 
 			if (nodeAnim1)
 			{
@@ -322,10 +323,12 @@
 				rot1 = nodeAnim1->mRotationKeys[f].mValue;
 				f = Frame1 % nodeAnim1->mNumPositionKeys;
 				pos1 = nodeAnim1->mPositionKeys[f].mValue;
+				has1 = true;
 			}
 
 			aiQuaternion rot2;
 			aiVector3D pos2;
+			bool has2 = false;
 
 			if (nodeAnim2)
 			{
@@ -333,7 +336,15 @@
 				rot2 = nodeAnim2->mRotationKeys[f].mValue;
 				f = Frame2 % nodeAnim2->mNumPositionKeys;
 				pos2 = nodeAnim2->mPositionKeys[f].mValue;
+				has2 = true;
 			}
+
+			// A bone missing a channel in one clip should hold whatever the OTHER
+			// clip has for it, not silently default to identity/zero - otherwise a
+			// missing channel snaps that bone (and everything below it in the
+			// hierarchy) to the origin for the whole clip, even once fully blended in.
+			if (!has1 && has2) { rot1 = rot2; pos1 = pos2; }
+			if (!has2 && has1) { rot2 = rot1; pos2 = pos1; }
 
 			aiVector3D pos = pos1 * (1.0f - Blend) + pos2 * Blend;
 
@@ -445,5 +456,21 @@
 			OutputDebugStringA(pair.first.c_str());
 			OutputDebugStringA("\n");
 		}
+	}
+
+	int AnimationModel::GetAnimationFrameCount(const std::string& AnimationName) const
+	{
+		auto it = m_Animation.find(AnimationName);
+		if (it == m_Animation.end())
+			return 0;
+
+		if (!it->second->HasAnimations())
+			return 0;
+
+		aiAnimation* animation = it->second->mAnimations[0];
+		if (animation->mNumChannels == 0)
+			return 0;
+
+		return (int)animation->mChannels[0]->mNumPositionKeys;
 	}
 

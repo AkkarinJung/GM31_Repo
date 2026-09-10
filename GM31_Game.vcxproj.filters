@@ -25,6 +25,12 @@
     <Filter Include="Header Files\WeaponClass">
       <UniqueIdentifier>{1faba5ed-26c7-47d4-b276-ee8550ea6201}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\UI">
+      <UniqueIdentifier>{c22ca55b-9d03-410d-b423-5fc9ac411e55}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\UI">
+      <UniqueIdentifier>{d5e8a66b-c8f2-46ec-98ca-e7214380f1d1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -116,6 +122,9 @@
     </ClCompile>
     <ClCompile Include="BoneAttachPoint.cpp">
       <Filter>Source Files\WeaponClass</Filter>
+    </ClCompile>
+    <ClCompile Include="HPBar.cpp">
+      <Filter>Source Files\UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -220,6 +229,12 @@
     </ClInclude>
     <ClInclude Include="BoneAttachPoint.h">
       <Filter>Header Files\WeaponClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Stats.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HPBar.h">
+      <Filter>Header Files\UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
