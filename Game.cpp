@@ -9,6 +9,7 @@
 //#include "field.h"
 #include "MeshField.h"
 #include "Player.h"
+#include "EnemyAI.h"
 #include "Enemy.h"
 #include "bullet.h"
 #include "Explosion.h"
@@ -49,9 +50,13 @@ void Game::Init()
 	Manager::AddGameObj<Enemy>()->SetPosition({ 8.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 9.0f,0.0f,1.0f });
 	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f,-1.0f,1.0f });*/
-	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f, 0.0f, 0.0f });
+	Enemy* enemy = Manager::AddGameObj<Enemy>();
+	enemy->SetPosition({ 5.0f, 0.0f, 0.0f });
+	enemy->GetAI()->Configure(EnemyAIConfig::Walker());
 
-
+	Enemy* enemy2 = Manager::AddGameObj<Enemy>();
+	enemy2->SetPosition({ 7.0f, 0.0f, 0.0f });
+	enemy2->GetAI()->Configure(EnemyAIConfig::Walker());
 
 	Box* box = Manager::AddGameObj<Box>();
 	box->SetPosition({ 5.0f, 0.0f, 5.0f });

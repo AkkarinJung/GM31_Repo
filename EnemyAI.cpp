@@ -35,7 +35,7 @@ EnemyAIConfig EnemyAIConfig::Walker()
     config.DetectRange = 6.0f;
     config.LoseRange = 9.0f;
     config.ChaseSpeed = 3.0f;
-    config.StopDistance = 1.0f;
+    config.StopDistance = 1.5f; // must stay outside the 1.4 player/enemy collision floor in Player::Update
     config.CanAttack = true;
     config.AttackRange = 1.7f;
     config.AttackCooldown = 1.2f;
@@ -63,7 +63,7 @@ EnemyAIConfig EnemyAIConfig::Flyer()
     config.DetectRange = 7.0f;
     config.LoseRange = 10.0f;
     config.ChaseSpeed = 2.2f;
-    config.StopDistance = 0.6f;
+    config.StopDistance = 1.5f;
     config.CanAttack = true;
     config.AttackRange = 1.6f;
     config.AttackCooldown = 1.5f;
@@ -248,7 +248,15 @@ void EnemyAI::Steer()
     }
 
     if (canMove)
-        m_MoveDirection += SeparationBias();
+    {
+        Vector3 separation = SeparationBias();
+        m_MoveDirection += separation;
+
+        // separation still has to move the enemy after it stops closing in,
+        // otherwise several enemies stack on the same spot
+        if (m_MoveSpeed <= 0.0f && fabsf(separation.x) > 0.001f)
+            m_MoveSpeed = m_Config.ChaseSpeed;
+    }
 
     UpdateVertical();
     UpdateFacing();

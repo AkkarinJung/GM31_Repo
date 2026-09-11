@@ -64,7 +64,7 @@ void Enemy::Update()
     bool attacking = (m_AI->GetState() == EnemyState::Attack);
     m_ModelRenderer->SetFlashColor(m_Flash
         ? XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f)
-        : XMFLOAT4(1.0f, 0.15f, 0.15f, 1.0f));
+        : XMFLOAT4(1.0f, 0.15f, 0.15f, 0.9f));
     m_ModelRenderer->SetFlash(m_Flash || attacking);
 
     if (m_ShakeTime > 0.04f)

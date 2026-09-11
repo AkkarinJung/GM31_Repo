@@ -299,8 +299,6 @@ void Player::Update()
                 dir /= length;
                 m_Position += dir * overlap;
             }
-
-            break;
         }
     }
 
