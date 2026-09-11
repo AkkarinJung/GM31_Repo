@@ -84,6 +84,7 @@
     <ClInclude Include="Polygon2D.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="Result.h" />
+    <ClInclude Include="RotationUtil.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />

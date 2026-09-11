@@ -19,16 +19,13 @@
 #include "Stats.h"
 
 #include "BoneAttachPoint.h"
+#include "RotationUtil.h"
 #include "Sword.h"
 
 void Player::Init()
 {
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
-    m_Rotation.y = XM_PIDIV2; // face screen-right by default - matches the yaw
-                              // the movement code produces when moving right,
-                              // so the character isn't edge-on before the
-                              // first key press
     m_Scale = { 0.01f, 0.01f, 0.01f };
 
     //ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
@@ -193,13 +190,16 @@ void Player::Update()
     if (Input::GetKeyTrigger('P'))
         m_WeaponSocket->DebugPrintTransform();
 
-    if (move)
+    // Only re-aim while actually moving. atan2f(0, 0) is 0, so reading the
+    // facing every frame snapped the player (and the sword parented to it)
+    // round to face +Z the moment the velocity died out, and flipped it
+    // 180 degrees on the frame the velocity crossed zero.
+    if (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f)
         m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
 
-    if (Input::GetKeyTrigger(VK_SPACE) && m_JumpCount < m_MaxJumps)
+    if (Input::GetKeyTrigger(VK_SPACE))
     {
-        m_Velocity.y += m_JumpPower;
-        m_JumpCount++;
+        m_Velocity.y += 20.0f;
 
         //m_Scale.y = 2.0f;
         //m_Scale.x = 0.5f;
@@ -299,6 +299,8 @@ void Player::Update()
                 dir /= length;
                 m_Position += dir * overlap;
             }
+
+            break;
         }
     }
 
@@ -344,7 +346,6 @@ void Player::Update()
 
     if (m_Ground)
     {
-        m_JumpCount = 0;
         //m_MoveAnimation += VectorMag(m_Velocity) * dt;
         //m_Scale.y += sinf(m_MoveAnimation * 3.0f) * 0.03f;
     }
@@ -357,11 +358,6 @@ void Player::Update()
     Vector3 shadowPos = m_Position;
     shadowPos.y = 0.01f;
     m_Shadow->SetPosition(shadowPos);
-
-    if (m_Attacking && !m_FreezeAnimation)
-    {
-        UpdateAttackWeaponOffset();
-    }
 
     if (!m_Attacking)
     {
@@ -386,6 +382,13 @@ void Player::Update()
         m_Blend += 0.1f;
         if (m_Blend > 1.0f)
             m_Blend = 1.0f;
+    }
+
+    // After the frame counter moved, so the swing offset is the one that
+    // belongs to the pose about to be evaluated - not the previous frame's.
+    if (m_Attacking && !m_FreezeAnimation)
+    {
+        UpdateAttackWeaponOffset();
     }
 
     m_AnimationModel->Update(m_AnimationName.c_str(), m_AnimationFrame, m_NextAnimationName.c_str(), m_NextAnimationFrame, m_Blend);
@@ -483,21 +486,10 @@ Vector3 Player::SlerpRotation(const Vector3& RotA, const Vector3& RotB, float T)
 
     XMVECTOR result = XMQuaternionSlerp(qa, qb, T);
 
-    XMFLOAT4 q;
-    XMStoreFloat4(&q, result);
-
-    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
-    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
-    float roll = atan2f(sinr_cosp, cosr_cosp);
-
-    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
-    float pitch = fabsf(sinp) >= 1.0f ? copysignf(XM_PIDIV2, sinp) : asinf(sinp);
-
-    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
-    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
-    float yaw = atan2f(siny_cosp, cosy_cosp);
-
-    return { pitch, yaw, roll };
+    // Back to Euler in the same order XMQuaternionRotationRollPitchYaw
+    // built them, so interpolating between two tuned offsets returns the
+    // offsets themselves at T = 0 and T = 1 instead of a scrambled pose.
+    return EulerFromQuaternion(result);
 }
 
 void Player::StartAttack()

@@ -15,6 +15,13 @@ protected:
 
 	std::list<Component*> m_Components;
 	GameObject* m_Parent = nullptr;
+
+	// Optional exact local matrix, used instead of position/rotation/scale
+	// when something drives this object with a matrix (see SetLocalMatrix).
+	// Stored as XMFLOAT4X4, not XMMATRIX: XMMATRIX needs 16 byte alignment,
+	// which a heap allocated GameObject does not get on the Win32 build.
+	bool m_UseLocalMatrix = false;
+	XMFLOAT4X4 m_LocalMatrix;
 public:
 	const int GetLayer() const { return m_Layer; }
 
@@ -36,13 +43,35 @@ public:
 
 	void SetParent(GameObject* Parent) { m_Parent = Parent; }
 
+	// Drive this object with an exact local matrix instead of
+	// position/rotation/scale. Euler angles cannot express every matrix
+	// (and never survive a decompose/recompose round trip cleanly), so
+	// anything following an animated bone should hand over the matrix
+	// itself - see BoneAttachPoint. The parent transform still applies.
+	void SetLocalMatrix(const XMMATRIX& Matrix)
+	{
+		XMStoreFloat4x4(&m_LocalMatrix, Matrix);
+		m_UseLocalMatrix = true;
+	}
+	void ClearLocalMatrix() { m_UseLocalMatrix = false; }
+	bool HasLocalMatrix() const { return m_UseLocalMatrix; }
+
 	XMMATRIX GetMatrx()
 	{
-		XMMATRIX world, scale, rot, trans;
-		scale = XMMatrixScaling(m_Scale.x, m_Scale.y, m_Scale.z);
-		rot = XMMatrixRotationRollPitchYaw(m_Rotation.x, m_Rotation.y, m_Rotation.z);
-		trans = XMMatrixTranslation(m_Position.x, m_Position.y, m_Position.z);
-		world = scale * rot * trans;
+		XMMATRIX world;
+
+		if (m_UseLocalMatrix)
+		{
+			world = XMLoadFloat4x4(&m_LocalMatrix);
+		}
+		else
+		{
+			XMMATRIX scale, rot, trans;
+			scale = XMMatrixScaling(m_Scale.x, m_Scale.y, m_Scale.z);
+			rot = XMMatrixRotationRollPitchYaw(m_Rotation.x, m_Rotation.y, m_Rotation.z);
+			trans = XMMatrixTranslation(m_Position.x, m_Position.y, m_Position.z);
+			world = scale * rot * trans;
+		}
 
 		if (m_Parent)
 		{

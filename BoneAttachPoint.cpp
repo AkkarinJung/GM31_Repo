@@ -2,27 +2,7 @@
 #include "BoneAttachPoint.h"
 #include "renderer.h"
 #include "GameObject.h"
-
-
-static Vector3 QuaternionToEuler(XMVECTOR Quat)
-{
-    XMFLOAT4 q;
-    XMStoreFloat4(&q, Quat);
-
-    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
-    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
-    float roll = atan2f(sinr_cosp, cosr_cosp);
-
-    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
-    float pitch = fabsf(sinp) >= 1.0f ? copysignf(XM_PIDIV2, sinp) : asinf(sinp);
-
-    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
-    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
-    float yaw = atan2f(siny_cosp, cosy_cosp);
-
-    // GameObject uses XMMatrixRotationRollPitchYaw(x=pitch, y=yaw, z=roll)
-    return { pitch, yaw, roll };
-}
+#include "RotationUtil.h"
 
 void BoneAttachPoint::SetBone(AnimationModel* Model, const char* BoneName)
 {
@@ -50,7 +30,10 @@ GameObject* BoneAttachPoint::Detach()
 {
     GameObject* item = m_Attached;
     if (item != nullptr)
+    {
         item->SetParent(nullptr);
+        item->ClearLocalMatrix(); // back to driving itself by position/rotation/scale
+    }
 
     m_Attached = nullptr;
     return item;
@@ -72,9 +55,6 @@ void BoneAttachPoint::Update()
 
     XMMATRIX finalMatrix = offset * boneMatrix;
 
-    XMVECTOR scale, rotQuat, translation;
-    XMMatrixDecompose(&scale, &rotQuat, &translation, finalMatrix);
-
     // The sword is parented to m_GameObject (e.g. Player), whose own
     // GetMatrx() will multiply this local transform by its own scale
     // (e.g. Player's 0.01 body-mesh correction). That scale has nothing
@@ -82,22 +62,42 @@ void BoneAttachPoint::Update()
     // just the scale component - position/rotation still inherit the
     // parent normally, which is what makes it "follow".
     XMVECTOR ownerScale, ownerRotQuat, ownerTranslation;
-    XMMatrixDecompose(&ownerScale, &ownerRotQuat, &ownerTranslation, m_GameObject->GetMatrx());
+    if (XMMatrixDecompose(&ownerScale, &ownerRotQuat, &ownerTranslation, m_GameObject->GetMatrx()))
+    {
+        XMFLOAT3 ownerScaleF;
+        XMStoreFloat3(&ownerScaleF, ownerScale);
 
-    XMFLOAT3 ownerScaleF;
-    XMStoreFloat3(&ownerScaleF, ownerScale);
+        if (ownerScaleF.x != 0.0f && ownerScaleF.y != 0.0f && ownerScaleF.z != 0.0f)
+        {
+            finalMatrix = XMMatrixScaling(1.0f / ownerScaleF.x,
+                1.0f / ownerScaleF.y,
+                1.0f / ownerScaleF.z) * finalMatrix;
+        }
+    }
 
-    Vector3 scaleVec;
-    XMStoreFloat3((XMFLOAT3*)&scaleVec, scale);
-    scaleVec.x /= ownerScaleF.x;
-    scaleVec.y /= ownerScaleF.y;
-    scaleVec.z /= ownerScaleF.z;
+    // Hand the bone transform over as a matrix. Going through
+    // position/rotation/scale here would mean packing the bone's rotation
+    // into three Euler angles and rebuilding it in GameObject::GetMatrx()
+    // - a round trip that loses the rotation as soon as the hand turns
+    // around more than one axis (and flips near gimbal lock), which is
+    // exactly when a sword swing looks broken.
+    m_Attached->SetLocalMatrix(finalMatrix);
+
+    // Position/rotation/scale are still kept in sync so gameplay code and
+    // the debug print can read the weapon's transform - they no longer
+    // drive the rendering, so an imperfect decompose can't distort it.
+    XMVECTOR scale, rotQuat, translation;
+    if (!XMMatrixDecompose(&scale, &rotQuat, &translation, finalMatrix))
+        return;
 
     Vector3 position;
     XMStoreFloat3((XMFLOAT3*)&position, translation);
 
+    Vector3 scaleVec;
+    XMStoreFloat3((XMFLOAT3*)&scaleVec, scale);
+
     m_Attached->SetPosition(position);
-    m_Attached->SetRotation(QuaternionToEuler(rotQuat));
+    m_Attached->SetRotation(EulerFromQuaternion(rotQuat));
     m_Attached->SetScale(scaleVec);
 }
 
