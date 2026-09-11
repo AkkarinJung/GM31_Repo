@@ -63,6 +63,7 @@ private:
 	MODEL* m_Model{};
 
 	bool m_Flash = false;
+	XMFLOAT4 m_FlashColor{ 1.0f, 1.0f, 1.0f, 1.0f };
 
 public:
 
@@ -76,5 +77,6 @@ public:
 	void Draw() override;
 
 	void SetFlash(bool Flash) { m_Flash = Flash; }
+	void SetFlashColor(const XMFLOAT4& Color) { m_FlashColor = Color; }
 
 };

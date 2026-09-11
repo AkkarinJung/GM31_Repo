@@ -28,6 +28,7 @@
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="DamageNumber.cpp" />
     <ClCompile Include="Enemy.cpp" />
+    <ClCompile Include="EnemyAI.cpp" />
     <ClCompile Include="Explosion.cpp" />
     <ClCompile Include="field.cpp" />
     <ClCompile Include="Game.cpp" />
@@ -65,6 +66,7 @@
     <ClInclude Include="DamageNumber.h" />
     <ClInclude Include="DirectXTex\DirectXTex.h" />
     <ClInclude Include="Enemy.h" />
+    <ClInclude Include="EnemyAI.h" />
     <ClInclude Include="Explosion.h" />
     <ClInclude Include="field.h" />
     <ClInclude Include="Game.h" />

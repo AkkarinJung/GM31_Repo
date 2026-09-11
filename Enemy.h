@@ -6,34 +6,24 @@
 class Enemy : public GameObject
 {
 private:
-    // Bezier
-    float m_T = 0.0f;
-    float m_MoveSpeed = 0.2f;
+    // Decision making - what this enemy wants to do. Movement, animation and
+    // damage below stay this class's responsibility.
+    class EnemyAI* m_AI = nullptr;
+    int m_AttackDamage = 20;
+
+    void AttackTarget();
 
     // Sine Wave
     float m_Time = 0.0f;
     float m_Amplitude = 0.7f;
     float m_Frequency = 5.0f;
 
-    bool m_PathInitialized = false;
-
-    Vector3 P0 = Vector3(0.0f, 0.0f, 0.0f);
-    Vector3 P1 = Vector3(0.0f, 0.0f, 0.0f);
-    Vector3 P2 = Vector3(0.0f, 0.0f, 0.0f);
-    Vector3 P3 = Vector3(0.0f, 0.0f, 0.0f);
-
-    Vector3 Bezier(float t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3);
-
-    void CreateRandomBezier();
-    float Clamp(float value, float minValue, float maxValue);
+    float m_BaseScale = 0.7f; // overall size multiplier - shrink the enemy a bit; tune to taste
 
     // Collision / physics
     Vector3 m_Velocity = Vector3(0.0f, 0.0f, 0.0f);
     float m_Radius = 1.0f;
     float m_Mass = 1.0f;
-    float m_BoundConst = 0.8f; // e
-
-    float m_BeforeDistance = 999999.0f;
 
     // Shader
     ID3D11InputLayout* m_VertexLayout = nullptr;
@@ -46,13 +36,9 @@ private:
     float m_ShakeTime;
 
     class Stats* m_Stats = nullptr;
-    float m_BaseScale = 0.5f; // overall size multiplier - shrink the enemy a bit; tune to taste
-
     bool m_Flash;
 
     GameObject* m_Shadow;
-
-    bool m_TestStationary = true; // stand still so it's an easy hit target for now - flip off once wander AI matters again
 
 public:
     void Init() override;
@@ -66,5 +52,8 @@ public:
         m_ShakeTime = 0;
     }
     void AddDamage(int Damage);
+
+    // Spawn-time configuration: Manager::AddGameObj<Enemy>()->GetAI()->Configure(...)
+    class EnemyAI* GetAI() const { return m_AI; }
 
 };

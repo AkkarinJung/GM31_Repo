@@ -34,7 +34,7 @@ void ModelRenderer::Draw()
 		if (m_Flash)
 		{
 			MATERIAL material{};
-			material.Diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
+			material.Diffuse = m_FlashColor;
 			material.TextureEnable = false;
 			Renderer::SetMaterial(material);
 		}
