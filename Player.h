@@ -15,6 +15,9 @@ private:
     bool m_Ground = true;
     float m_MoveAnimation = 0.0f;
     class Audio* m_JumpSE;
+    int m_JumpCount = 0;
+    int m_MaxJumps = 1; // raise this later for double/triple jump
+    float m_JumpPower = 20.0f;
 
     GameObject* m_Child;
     GameObject* m_Shadow;

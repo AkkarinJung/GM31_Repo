@@ -26,6 +26,7 @@
     <ClCompile Include="Bullet.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Collision.cpp" />
+    <ClCompile Include="DamageNumber.cpp" />
     <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="Explosion.cpp" />
     <ClCompile Include="field.cpp" />
@@ -61,6 +62,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="component.h" />
+    <ClInclude Include="DamageNumber.h" />
     <ClInclude Include="DirectXTex\DirectXTex.h" />
     <ClInclude Include="Enemy.h" />
     <ClInclude Include="Explosion.h" />

@@ -54,12 +54,7 @@ void Sword::Use(GameObject* Owner)
         if (Vector3::dot(forward, toEnemy) < m_AngleDot)
             continue;
 
-        Stats* enemyStats = enemy->GetGameComponent<Stats>();
-        if (enemyStats != nullptr)
-            enemyStats->TakeDamage(attackPower);
-        else
-            enemy->AddDamage(attackPower); // Enemy hasn't been migrated to Stats yet
-
+        enemy->AddDamage(attackPower);
         enemy->Shake(forward * 0.3f);
     }
 }

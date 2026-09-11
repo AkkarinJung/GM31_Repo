@@ -7,6 +7,9 @@
 #include "Camera.h"
 #include "Score.h"
 #include "Shadow.h"
+#include "Stats.h"
+#include "DamageNumber.h"
+
 #include <algorithm>
 #define NOMINMAX
 #include <cmath>
@@ -14,8 +17,9 @@
 void Enemy::Init()
 {
     m_Layer = 1;
-    m_Scale = { 1.0f, 1.0f, 1.0f };
-    m_Life = 2;
+    m_Scale = { m_BaseScale, m_BaseScale, m_BaseScale };
+    m_Stats = AddGameComponent<Stats>(this);
+    m_Stats->SetMaxHP(30); // a few sword hits to kill - tune as needed
     m_Flash =  true;
 
     P0 = m_Position;
@@ -61,161 +65,163 @@ void Enemy::Update()
         m_Flash = false;
     }
 
-    if (!m_PathInitialized)
+    if (!m_TestStationary)
     {
-        // first path starts at current position
-        P0 = m_Position;
-        P1 = m_Position;
-        P2 = m_Position;
-        P3 = m_Position;
-        CreateRandomBezier();
-        m_PathInitialized = true;
-        m_T = 0.0f;
-    }
-
-    // -----------------------------
-    // Advance Bezier parameter
-    // -----------------------------
-    m_T += m_MoveSpeed * dt;
-
-    while (m_T > 1.0f)
-    {
-        m_T -= 1.0f;       // keep overflow (continuous motion)
-        CreateRandomBezier();
-    }
-
-    // Current / next point on curve
-    Vector3 pos = Bezier(m_T, P0, P1, P2, P3);
-
-    float nextT = m_T + 0.01f;
-    Vector3 nextP0 = P0, nextP1 = P1, nextP2 = P2, nextP3 = P3;
-
-    if (nextT > 1.0f)
-    {
-        // preview direction across boundary without moving state
-        nextT -= 1.0f;
-        nextP0 = P3;
-        // approximate forward continuation if next segment unknown:
-        Vector3 tangent = P3 - P2;
-        if ((tangent * tangent) < 0.000001f) tangent = Vector3(0.0f, 0.0f, 1.0f);
-        tangent.normalize();
-        nextP1 = nextP0 + tangent * 6.0f;
-        nextP2 = nextP0 + tangent * 12.0f;
-        nextP3 = nextP0 + tangent * 20.0f;
-    }
-
-    Vector3 nextPos = Bezier(nextT, nextP0, nextP1, nextP2, nextP3);
-
-    // Forward basis
-    Vector3 forward = nextPos - pos;
-    if ((forward * forward) < 0.000001f) forward = Vector3(0.0f, 0.0f, 1.0f);
-    else forward.normalize();
-
-    Vector3 worldUp(0.0f, 1.0f, 0.0f);
-    Vector3 right = Vector3::cross(forward, worldUp);
-    if ((right * right) < 0.001f) right = Vector3(1.0f, 0.0f, 0.0f);
-    right.normalize();
-
-    Vector3 up = Vector3::cross(right, forward);
-    up.normalize();
-
-    // -----------------------------
-    // Corkscrew offset
-    // -----------------------------
-    m_Time += dt;
-    const float radius = 0.8f; // reduced to avoid visual pop
-    const float speed = 8.0f;  // reduced to avoid jitter
-
-    Vector3 offset =
-        right * cosf(m_Time * speed) * radius +
-        up * sinf(m_Time * speed) * radius;
-
-    Vector3 desiredPos = pos + offset;
-
-    // ---------------------------------------------------------
-    // IMPORTANT: smooth follow, do NOT hard overwrite position
-    // ---------------------------------------------------------
-    Vector3 toDesired = desiredPos - m_Position;
-    const float follow = 8.0f; // tune 5~12
-    m_Velocity = toDesired * follow;
-    m_Position += m_Velocity * dt;
-
-    // Smooth yaw (neutral turn)
-    float targetYaw = atan2f(forward.x, forward.z) + XM_PI;
-    float deltaYaw = targetYaw - m_Rotation.y;
-    while (deltaYaw > XM_PI)  deltaYaw -= XM_2PI;
-    while (deltaYaw < -XM_PI) deltaYaw += XM_2PI;
-
-    const float turnSpeed = 4.0f;
-    float maxStep = turnSpeed * dt;
-    if (deltaYaw > maxStep) deltaYaw = maxStep;
-    if (deltaYaw < -maxStep) deltaYaw = -maxStep;
-    m_Rotation.y += deltaYaw;
-
-    // Squash & stretch
-    float bounce = sinf(m_Time * m_Frequency);
-    float scaleY = 1.0f + bounce * 0.15f;
-    float scaleXZ = 1.0f - bounce * 0.08f;
-    m_Scale.x = scaleXZ;
-    m_Scale.y = scaleY;
-    m_Scale.z = scaleXZ;
-
-    // -----------------------------
-    // Stable enemy-enemy collision
-    // -----------------------------
-    auto enemies = Manager::GetGameObjs<Enemy>();
-    for (Enemy* other : enemies)
-    {
-        if (other == this) continue;
-        if (this > other) continue; // resolve pair once
-
-        Vector3 delta = m_Position - other->m_Position;
-        float distSq = delta * delta;
-        float minDist = m_Radius + other->m_Radius;
-        float minDistSq = minDist * minDist;
-
-        if (distSq >= minDistSq) continue;
-
-        float dist = sqrtf(distSq);
-        Vector3 n;
-        if (dist < 0.00001f)
+        if (!m_PathInitialized)
         {
-            n = Vector3(1.0f, 0.0f, 0.0f);
-            dist = minDist;
-        }
-        else
-        {
-            n = delta * (1.0f / dist);
+            // first path starts at current position
+            P0 = m_Position;
+            P1 = m_Position;
+            P2 = m_Position;
+            P3 = m_Position;
+            CreateRandomBezier();
+            m_PathInitialized = true;
+            m_T = 0.0f;
         }
 
-        // positional correction
-        float penetration = minDist - dist;
-        float totalMass = m_Mass + other->m_Mass;
-        if (totalMass < 0.00001f) totalMass = 1.0f;
+        // -----------------------------
+        // Advance Bezier parameter
+        // -----------------------------
+        m_T += m_MoveSpeed * dt;
 
-        float moveA = penetration * (other->m_Mass / totalMass);
-        float moveB = penetration * (m_Mass / totalMass);
+        while (m_T > 1.0f)
+        {
+            m_T -= 1.0f;       // keep overflow (continuous motion)
+            CreateRandomBezier();
+        }
 
-        m_Position += n * moveA;
-        other->m_Position -= n * moveB;
+        // Current / next point on curve
+        Vector3 pos = Bezier(m_T, P0, P1, P2, P3);
 
-        // impulse
-        Vector3 rv = m_Velocity - other->m_Velocity;
-        float velAlongNormal = Vector3::dot(rv, n);
-        if (velAlongNormal > 0.0f) continue;
+        float nextT = m_T + 0.01f;
+        Vector3 nextP0 = P0, nextP1 = P1, nextP2 = P2, nextP3 = P3;
 
-        float e = m_BoundConst;
-        float invA = (m_Mass > 0.00001f) ? (1.0f / m_Mass) : 0.0f;
-        float invB = (other->m_Mass > 0.00001f) ? (1.0f / other->m_Mass) : 0.0f;
+        if (nextT > 1.0f)
+        {
+            // preview direction across boundary without moving state
+            nextT -= 1.0f;
+            nextP0 = P3;
+            // approximate forward continuation if next segment unknown:
+            Vector3 tangent = P3 - P2;
+            if ((tangent * tangent) < 0.000001f) tangent = Vector3(0.0f, 0.0f, 1.0f);
+            tangent.normalize();
+            nextP1 = nextP0 + tangent * 6.0f;
+            nextP2 = nextP0 + tangent * 12.0f;
+            nextP3 = nextP0 + tangent * 20.0f;
+        }
 
-        float denom = invA + invB;
-        if (denom < 0.00001f) continue;
+        Vector3 nextPos = Bezier(nextT, nextP0, nextP1, nextP2, nextP3);
 
-        float j = -(1.0f + e) * velAlongNormal / denom;
-        Vector3 impulse = n * j;
+        // Forward basis
+        Vector3 forward = nextPos - pos;
+        if ((forward * forward) < 0.000001f) forward = Vector3(0.0f, 0.0f, 1.0f);
+        else forward.normalize();
 
-        m_Velocity += impulse * invA;
-        other->m_Velocity -= impulse * invB;
+        Vector3 worldUp(0.0f, 1.0f, 0.0f);
+        Vector3 right = Vector3::cross(forward, worldUp);
+        if ((right * right) < 0.001f) right = Vector3(1.0f, 0.0f, 0.0f);
+        right.normalize();
+
+        Vector3 up = Vector3::cross(right, forward);
+        up.normalize();
+
+        // -----------------------------
+        // Corkscrew offset
+        // -----------------------------
+        m_Time += dt;
+        const float radius = 0.8f; // reduced to avoid visual pop
+        const float speed = 8.0f;  // reduced to avoid jitter
+
+        Vector3 offset =
+            right * cosf(m_Time * speed) * radius +
+            up * sinf(m_Time * speed) * radius;
+
+        Vector3 desiredPos = pos + offset;
+
+        // ---------------------------------------------------------
+        // IMPORTANT: smooth follow, do NOT hard overwrite position
+        // ---------------------------------------------------------
+        Vector3 toDesired = desiredPos - m_Position;
+        const float follow = 8.0f; // tune 5~12
+        m_Velocity = toDesired * follow;
+        m_Position += m_Velocity * dt;
+
+        // Smooth yaw (neutral turn)
+        float targetYaw = atan2f(forward.x, forward.z) + XM_PI;
+        float deltaYaw = targetYaw - m_Rotation.y;
+        while (deltaYaw > XM_PI)  deltaYaw -= XM_2PI;
+        while (deltaYaw < -XM_PI) deltaYaw += XM_2PI;
+
+        const float turnSpeed = 4.0f;
+        float maxStep = turnSpeed * dt;
+        if (deltaYaw > maxStep) deltaYaw = maxStep;
+        if (deltaYaw < -maxStep) deltaYaw = -maxStep;
+        m_Rotation.y += deltaYaw;
+
+        // Squash & stretch
+        float bounce = sinf(m_Time * m_Frequency);
+        float scaleY = m_BaseScale * (1.0f + bounce * 0.15f);
+        float scaleXZ = m_BaseScale * (1.0f - bounce * 0.08f);
+        m_Scale.x = scaleXZ;
+        m_Scale.y = scaleY;
+        m_Scale.z = scaleXZ;
+        // -----------------------------
+        // Stable enemy-enemy collision
+        // -----------------------------
+        auto enemies = Manager::GetGameObjs<Enemy>();
+        for (Enemy* other : enemies)
+        {
+            if (other == this) continue;
+            if (this > other) continue; // resolve pair once
+
+            Vector3 delta = m_Position - other->m_Position;
+            float distSq = delta * delta;
+            float minDist = m_Radius + other->m_Radius;
+            float minDistSq = minDist * minDist;
+
+            if (distSq >= minDistSq) continue;
+
+            float dist = sqrtf(distSq);
+            Vector3 n;
+            if (dist < 0.00001f)
+            {
+                n = Vector3(1.0f, 0.0f, 0.0f);
+                dist = minDist;
+            }
+            else
+            {
+                n = delta * (1.0f / dist);
+            }
+
+            // positional correction
+            float penetration = minDist - dist;
+            float totalMass = m_Mass + other->m_Mass;
+            if (totalMass < 0.00001f) totalMass = 1.0f;
+
+            float moveA = penetration * (other->m_Mass / totalMass);
+            float moveB = penetration * (m_Mass / totalMass);
+
+            m_Position += n * moveA;
+            other->m_Position -= n * moveB;
+
+            // impulse
+            Vector3 rv = m_Velocity - other->m_Velocity;
+            float velAlongNormal = Vector3::dot(rv, n);
+            if (velAlongNormal > 0.0f) continue;
+
+            float e = m_BoundConst;
+            float invA = (m_Mass > 0.00001f) ? (1.0f / m_Mass) : 0.0f;
+            float invB = (other->m_Mass > 0.00001f) ? (1.0f / other->m_Mass) : 0.0f;
+
+            float denom = invA + invB;
+            if (denom < 0.00001f) continue;
+
+            float j = -(1.0f + e) * velAlongNormal / denom;
+            Vector3 impulse = n * j;
+
+            m_Velocity += impulse * invA;
+            other->m_Velocity -= impulse * invB;
+        }
     }
 
     Vector3 shadowPos = m_Position;
@@ -289,9 +295,15 @@ float Enemy::Clamp(float value, float minValue, float maxValue)
 
 void Enemy::AddDamage(int Damage)
 {
-    m_Life -= Damage;
+    m_Stats->TakeDamage(Damage);
     m_Flash = true;
-    if (m_Life <= 0)
+
+    DamageNumber* damageNumber = Manager::AddGameObj<DamageNumber>();
+    Vector3 headPos = m_Position;
+    headPos.y += 1.5f * m_BaseScale; // above the head, scales with the enemy's size
+    damageNumber->Init(headPos, Damage);
+
+    if (m_Stats->IsDead())
     {
         SetDestory();
         Explosion* explosion = Manager::AddGameObj<Explosion>();

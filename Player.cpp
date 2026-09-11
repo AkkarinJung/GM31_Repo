@@ -25,6 +25,10 @@ void Player::Init()
 {
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
+    m_Rotation.y = XM_PIDIV2; // face screen-right by default - matches the yaw
+                              // the movement code produces when moving right,
+                              // so the character isn't edge-on before the
+                              // first key press
     m_Scale = { 0.01f, 0.01f, 0.01f };
 
     //ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
@@ -189,11 +193,13 @@ void Player::Update()
     if (Input::GetKeyTrigger('P'))
         m_WeaponSocket->DebugPrintTransform();
 
-    m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
+    if (move)
+        m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
 
-    if (Input::GetKeyTrigger(VK_SPACE))
+    if (Input::GetKeyTrigger(VK_SPACE) && m_JumpCount < m_MaxJumps)
     {
-        m_Velocity.y += 20.0f;
+        m_Velocity.y += m_JumpPower;
+        m_JumpCount++;
 
         //m_Scale.y = 2.0f;
         //m_Scale.x = 0.5f;
@@ -340,6 +346,7 @@ void Player::Update()
 
     if (m_Ground)
     {
+        m_JumpCount = 0;
         //m_MoveAnimation += VectorMag(m_Velocity) * dt;
         //m_Scale.y += sinf(m_MoveAnimation * 3.0f) * 0.03f;
     }

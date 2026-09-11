@@ -92,6 +92,7 @@ void  Camera::Draw()
     // プロジェクションマトリクス
     XMMATRIX projection = XMMatrixPerspectiveFovLH(1.1f,
         (float)SCREEN_WIDTH / SCREEN_HEIGHT, 1.0f, 1000.0f);
+    m_ProjectionMatrix = projection;
 
     Renderer::SetProjectionMatrix(projection);
 

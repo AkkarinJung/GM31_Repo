@@ -90,6 +90,9 @@ void MPBar::Uninit()
     m_VertexLayout->Release();
     m_VertexShader->Release();
     m_PixelShader->Release();
+
+    m_BackgroundTexture->Release();
+    m_FillTexture->Release();
 }
 
 void MPBar::Update()

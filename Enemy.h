@@ -45,10 +45,14 @@ private:
     Vector3 m_Shake;
     float m_ShakeTime;
 
-    float m_Life;
+    class Stats* m_Stats = nullptr;
+    float m_BaseScale = 0.5f; // overall size multiplier - shrink the enemy a bit; tune to taste
+
     bool m_Flash;
 
     GameObject* m_Shadow;
+
+    bool m_TestStationary = true; // stand still so it's an easy hit target for now - flip off once wander AI matters again
 
 public:
     void Init() override;

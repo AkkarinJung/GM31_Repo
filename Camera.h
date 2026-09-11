@@ -6,6 +6,7 @@ private:
 	//Vector3 m_Position{ 0.0f,0.0f,0.0f };
 	Vector3 m_Target{ 0.0f,0.0f,0.0f };
 	XMMATRIX m_ViewMatrix;
+	XMMATRIX m_ProjectionMatrix;
 
 	Vector3 m_Shake;
 	float m_ShakeTime;
@@ -17,6 +18,7 @@ public:
 	void Draw()override;
 
 	XMMATRIX GetViewMatrix() { return m_ViewMatrix; }
+	XMMATRIX GetProjectionMatrix() { return m_ProjectionMatrix; }
 
 	Vector3 GetFoward()override
 	{
