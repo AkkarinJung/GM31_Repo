@@ -10,6 +10,7 @@ void SkyDome::Init()
 {
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
+    m_Rotation.y = XM_PI * 0.5f;   // rotate the sky so the sun matches the light direction
     m_Scale = { 200.0f, 200.0f, 200.0f };
 
     ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
@@ -35,6 +36,11 @@ void  SkyDome::Update()
 {
     Camera* camera = Manager::GetGameObj<Camera>();
     m_Position = camera->GetPosition();
+
+    // ‹ó‚ð‚ä‚Á‚­‚è‰ñ‚·
+    m_Rotation.y += m_RotationSpeed * (1.0f / 60.0f);
+    if (m_Rotation.y > XM_2PI)
+        m_Rotation.y -= XM_2PI;
 
     GameObject::Update();
 }

@@ -16,7 +16,8 @@ ID3D11Buffer*			Renderer::m_ViewBuffer{};
 ID3D11Buffer*			Renderer::m_ProjectionBuffer{};
 ID3D11Buffer*			Renderer::m_MaterialBuffer{};
 ID3D11Buffer*			Renderer::m_LightBuffer{};
-
+ID3D11Buffer*			Renderer::m_CameraBuffer{};
+ID3D11Buffer*			Renderer::m_ParameterBuffer{};
 
 ID3D11DepthStencilState* Renderer::m_DepthStateEnable{};
 ID3D11DepthStencilState* Renderer::m_DepthStateDisable{};
@@ -227,8 +228,15 @@ void Renderer::Init()
 	m_DeviceContext->VSSetConstantBuffers( 4, 1, &m_LightBuffer );
 	m_DeviceContext->PSSetConstantBuffers( 4, 1, &m_LightBuffer );
 
+	bufferDesc.ByteWidth = sizeof(XMFLOAT4);
 
+	m_Device->CreateBuffer(&bufferDesc, NULL, &m_CameraBuffer);
+	m_DeviceContext->VSSetConstantBuffers(5, 1, &m_CameraBuffer);
+	m_DeviceContext->PSSetConstantBuffers(5, 1, &m_CameraBuffer);
 
+	m_Device->CreateBuffer(&bufferDesc, NULL, &m_ParameterBuffer);
+	m_DeviceContext->VSSetConstantBuffers(6, 1, &m_ParameterBuffer);
+	m_DeviceContext->PSSetConstantBuffers(6, 1, &m_ParameterBuffer);
 
 
 	// ƒ‰ƒCƒg‰Šú‰»
@@ -247,9 +255,6 @@ void Renderer::Init()
 	material.Ambient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	SetMaterial(material);
 
-
-
-
 }
 
 
@@ -262,6 +267,8 @@ void Renderer::Uninit()
 	m_ProjectionBuffer->Release();
 	m_LightBuffer->Release();
 	m_MaterialBuffer->Release();
+	m_CameraBuffer->Release();
+	m_ParameterBuffer->Release();
 
 
 	m_DeviceContext->ClearState();
@@ -368,7 +375,15 @@ void Renderer::SetLight( LIGHT Light )
 	m_DeviceContext->UpdateSubresource(m_LightBuffer, 0, NULL, &Light, 0, 0);
 }
 
+void Renderer::SetCameraPosition(const XMFLOAT4& Position)
+{
+	m_DeviceContext->UpdateSubresource(m_CameraBuffer, 0, NULL, &Position, 0, 0);
+}
 
+void Renderer::SetParameter(const XMFLOAT4& Parameter)
+{
+	m_DeviceContext->UpdateSubresource(m_ParameterBuffer, 0, NULL, &Parameter, 0, 0);
+}
 
 
 

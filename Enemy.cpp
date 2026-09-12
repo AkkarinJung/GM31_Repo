@@ -35,8 +35,16 @@ void Enemy::Init()
     m_ModelRenderer->Load("asset\\model\\Rabbit\\rabbit_1.obj");
 
 
-    Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\unlitTextureVS.cso");
-    Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");
+    Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\toonVS.cso");
+    Renderer::CreatePixelShader(&m_PixelShader, "shader\\toonPS.cso");
+
+    // トゥーンランプテクスチャ読込
+    TexMetadata metadata;
+    ScratchImage image;
+    LoadFromWICFile(L"asset\\texture\\toon_ramp.png", WIC_FLAGS_NONE, &metadata, image);
+    CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+        image.GetImageCount(), metadata, &m_RampTexture);
+    assert(m_RampTexture);
 
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 1.5f ,1.5f ,1.5f });
@@ -49,6 +57,7 @@ void Enemy::Uninit()
     if (m_VertexLayout) { m_VertexLayout->Release(); m_VertexLayout = nullptr; }
     if (m_VertexShader) { m_VertexShader->Release(); m_VertexShader = nullptr; }
     if (m_PixelShader) { m_PixelShader->Release();  m_PixelShader = nullptr; }
+    if (m_RampTexture) { m_RampTexture->Release(); m_RampTexture = nullptr; }
 
     GameObject::Uninit();
 }
@@ -171,6 +180,11 @@ void Enemy::Draw()
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
     Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
 
+    Renderer::SetParameter(m_Parameter);
+
+    // t0 is the model's own texture, set by ModelRenderer::Draw.
+    // Only the ramp has to be bound here.
+    Renderer::GetDeviceContext()->PSSetShaderResources(1, 1, &m_RampTexture);
 
     GameObject::Draw();
 }

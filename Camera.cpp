@@ -103,4 +103,6 @@ void  Camera::Draw()
         XMLoadFloat3(&up));
 
     Renderer::SetViewMatrix(m_ViewMatrix);
+    // カメラ位置 (トゥーンのエッジ判定で使用)
+    Renderer::SetCameraPosition(XMFLOAT4(m_Position.x, m_Position.y, m_Position.z, 1.0f));
 }
