@@ -76,11 +76,27 @@
 		//再帰的にボーン生成
 		CreateBone(m_AiScene->mRootNode);
 
+		//Node transforms per mesh, used for meshes no bone ever touches
+		m_MeshTransform.assign(m_AiScene->mNumMeshes, aiMatrix4x4());
+		CollectMeshTransforms(m_AiScene->mRootNode, aiMatrix4x4());
+
 
 
 		for (unsigned int m = 0; m < m_AiScene->mNumMeshes; m++)
 		{
 			aiMesh* mesh = m_AiScene->mMeshes[m];
+
+			// A mesh no bone ever touches (a prop like the sword) is never
+			// rewritten by Update(), so the transform its FBX node carries -
+			// for sword.fbx a 90 degree stand-up rotation and a 100x scale -
+			// would simply be lost. Bake it in once, here. Skinned meshes must
+			// stay in mesh space: their bone matrices already carry the node
+			// hierarchy, so they get the identity instead.
+			const bool skinned = (mesh->mNumBones > 0);
+			aiMatrix4x4 nodeMatrix = skinned ? aiMatrix4x4() : m_MeshTransform[m];
+			aiMatrix3x3 normalMatrix = aiMatrix3x3(nodeMatrix);
+			if (normalMatrix.Determinant() != 0.0f)
+				normalMatrix.Inverse().Transpose(); // inverse transpose: correct under non-uniform scale
 
 			// 頂点バッファ生成
 			{
@@ -88,8 +104,12 @@
 
 				for (unsigned int v = 0; v < mesh->mNumVertices; v++)
 				{
-					vertex[v].Position = XMFLOAT3(mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z);
-					vertex[v].Normal = XMFLOAT3(mesh->mNormals[v].x, mesh->mNormals[v].y, mesh->mNormals[v].z);
+					aiVector3D position = nodeMatrix * mesh->mVertices[v];
+					aiVector3D normal = normalMatrix * mesh->mNormals[v];
+					normal.Normalize();
+
+					vertex[v].Position = XMFLOAT3(position.x, position.y, position.z);
+					vertex[v].Normal = XMFLOAT3(normal.x, normal.y, normal.z);
 					vertex[v].TexCoord = XMFLOAT2(mesh->mTextureCoords[0][v].x, mesh->mTextureCoords[0][v].y);
 					vertex[v].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				}
@@ -149,8 +169,9 @@
 			for (unsigned int v = 0; v < mesh->mNumVertices; v++)
 			{
 				DEFORM_VERTEX deformVertex;
-				deformVertex.Position = mesh->mVertices[v];
-				deformVertex.Normal = mesh->mNormals[v];
+				deformVertex.Position = nodeMatrix * mesh->mVertices[v];
+				deformVertex.Normal = normalMatrix * mesh->mNormals[v];
+				deformVertex.Normal.Normalize();
 				deformVertex.BoneNum = 0;
 
 				for (unsigned int b = 0; b < 4; b++)
@@ -231,6 +252,22 @@
 			CreateBone(node->mChildren[n]);
 		}
 
+	}
+
+
+	void AnimationModel::CollectMeshTransforms(aiNode* node, const aiMatrix4x4& parentMatrix)
+	{
+		aiMatrix4x4 matrix = parentMatrix * node->mTransformation;
+
+		for (unsigned int m = 0; m < node->mNumMeshes; m++)
+		{
+			m_MeshTransform[node->mMeshes[m]] = matrix;
+		}
+
+		for (unsigned int n = 0; n < node->mNumChildren; n++)
+		{
+			CollectMeshTransforms(node->mChildren[n], matrix);
+		}
 	}
 
 
@@ -363,6 +400,13 @@
 			for (unsigned int n = 0; n < m_AiScene->mNumMeshes; n++)
 			{
 				aiMesh* mesh = m_AiScene->mMeshes[n];
+
+				// No bones -> no weights -> the blend below would collapse every
+				// vertex onto the origin. This mesh's buffer was baked at load
+				// time and never needs rewriting, so leave it alone.
+				if (mesh->mNumBones == 0)
+					continue;
+
 				D3D11_MAPPED_SUBRESOURCE ms;
 				Renderer::GetDeviceContext()->Map(m_VertexBuffer[n], 0,
 					D3D11_MAP_WRITE_DISCARD, 0, &ms);

@@ -53,27 +53,15 @@ void BoneAttachPoint::Update()
         XMMatrixRotationRollPitchYaw(m_LocalRotation.x, m_LocalRotation.y, m_LocalRotation.z) *
         XMMatrixTranslation(m_LocalPosition.x, m_LocalPosition.y, m_LocalPosition.z);
 
+    // The attached item lives in the owner's model space, the same space the
+    // bone matrix is in - so it inherits the owner's transform whole, scale
+    // included, and a weapon modelled in the same units as the body just
+    // works. (This used to divide the owner's scale back out to compensate
+    // for AnimationModel dropping a prop's node transform, which hid a 100x
+    // scale in sword.fbx. That is fixed at load time now, so cancelling the
+    // owner scale here would make the weapon 100x too big.) Use the socket's
+    // local scale for an asset that really is in different units.
     XMMATRIX finalMatrix = offset * boneMatrix;
-
-    // The sword is parented to m_GameObject (e.g. Player), whose own
-    // GetMatrx() will multiply this local transform by its own scale
-    // (e.g. Player's 0.01 body-mesh correction). That scale has nothing
-    // to do with the weapon's own mesh units, so cancel it back out of
-    // just the scale component - position/rotation still inherit the
-    // parent normally, which is what makes it "follow".
-    XMVECTOR ownerScale, ownerRotQuat, ownerTranslation;
-    if (XMMatrixDecompose(&ownerScale, &ownerRotQuat, &ownerTranslation, m_GameObject->GetMatrx()))
-    {
-        XMFLOAT3 ownerScaleF;
-        XMStoreFloat3(&ownerScaleF, ownerScale);
-
-        if (ownerScaleF.x != 0.0f && ownerScaleF.y != 0.0f && ownerScaleF.z != 0.0f)
-        {
-            finalMatrix = XMMatrixScaling(1.0f / ownerScaleF.x,
-                1.0f / ownerScaleF.y,
-                1.0f / ownerScaleF.z) * finalMatrix;
-        }
-    }
 
     // Hand the bone transform over as a matrix. Going through
     // position/rotation/scale here would mean packing the bone's rotation

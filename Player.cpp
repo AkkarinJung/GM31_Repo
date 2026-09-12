@@ -19,7 +19,6 @@
 #include "Stats.h"
 
 #include "BoneAttachPoint.h"
-#include "RotationUtil.h"
 #include "Sword.h"
 
 void Player::Init()
@@ -46,7 +45,7 @@ void Player::Init()
 
     m_WeaponSocket = AddGameComponent<BoneAttachPoint>(this);
     m_WeaponSocket->SetBone(m_AnimationModel, "mixamorig:RightHand");
-    m_WeaponSocket->SetLocalTransform(m_IdleWeaponOffsetPos, m_IdleWeaponOffsetRot, { 1.0f, 1.0f, 1.0f });
+    m_WeaponSocket->SetLocalTransform(m_WeaponOffsetPos, m_WeaponOffsetRot, { 1.0f, 1.0f, 1.0f });
     m_Weapon = Manager::AddGameObj<Sword>();
     m_WeaponSocket->Attach(m_Weapon);
 
@@ -87,21 +86,11 @@ void Player::Uninit()
 
 void Player::Update()
 {
-    if (Input::GetKeyTrigger('1'))
-    {
-        m_TuningKeyframeIndex = 0;
-        if (m_Attacking) { m_NextAnimationFrame = 0; m_Blend = 1.0f; }
-    }
-    if (Input::GetKeyTrigger('2'))
-    {
-        m_TuningKeyframeIndex = 1;
-        if (m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength / 2; m_Blend = 1.0f; }
-    }
-    if (Input::GetKeyTrigger('3'))
-    {
-        m_TuningKeyframeIndex = 2;
-        if (m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength - 1; m_Blend = 1.0f; }
-    }
+    // 1/2/3 jump to the start / middle / end of the current swing, which is
+    // how you check the grip at the extremes of the animation (F2 freezes).
+    if (Input::GetKeyTrigger('1') && m_Attacking) { m_NextAnimationFrame = 0; m_Blend = 1.0f; }
+    if (Input::GetKeyTrigger('2') && m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength / 2; m_Blend = 1.0f; }
+    if (Input::GetKeyTrigger('3') && m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength - 1; m_Blend = 1.0f; }
 
     if (Input::GetKeyTrigger(VK_F2))
         m_FreezeAnimation = !m_FreezeAnimation;
@@ -147,45 +136,20 @@ void Player::Update()
     float tuneStep = 20.0f * dt;
     float tuneRotStep = 2.0f * dt;
 
-    if (m_Attacking)
-    {
-        Vector3& tuningPos = m_UsingRightAttack ? m_RightAttackOffsetPos[m_TuningKeyframeIndex] : m_AttackOffsetPos[m_AttackCombo][m_TuningKeyframeIndex];
-        Vector3& tuningRot = m_UsingRightAttack ? m_RightAttackOffsetRot[m_TuningKeyframeIndex] : m_AttackOffsetRot[m_AttackCombo][m_TuningKeyframeIndex];
-
-        if (Input::GetKeyPress('H')) tuningPos.x -= tuneStep;
-        if (Input::GetKeyPress('K')) tuningPos.x += tuneStep;
-        if (Input::GetKeyPress('N')) tuningPos.y -= tuneStep;
-        if (Input::GetKeyPress('U')) tuningPos.y += tuneStep;
-        if (Input::GetKeyPress('G')) tuningPos.z -= tuneStep;
-        if (Input::GetKeyPress('T')) tuningPos.z += tuneStep;
-
-        if (Input::GetKeyPress('Z')) tuningRot.x -= tuneRotStep;
-        if (Input::GetKeyPress('X')) tuningRot.x += tuneRotStep;
-        if (Input::GetKeyPress('C')) tuningRot.y -= tuneRotStep;
-        if (Input::GetKeyPress('V')) tuningRot.y += tuneRotStep;
-        if (Input::GetKeyPress('B')) tuningRot.z -= tuneRotStep;
-        if (Input::GetKeyPress('M')) tuningRot.z += tuneRotStep;
-
-        if (m_FreezeAnimation)
-        {
-            m_WeaponSocket->SetLocalTransform(tuningPos, tuningRot, { 1.0f, 1.0f, 1.0f });
-        }
-    }
-    else
-    {
-        if (Input::GetKeyPress('H')) m_WeaponSocket->AdjustLocalPosition({ -tuneStep, 0.0f, 0.0f });
-        if (Input::GetKeyPress('K')) m_WeaponSocket->AdjustLocalPosition({ tuneStep, 0.0f, 0.0f });
-        if (Input::GetKeyPress('N')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, -tuneStep, 0.0f });
-        if (Input::GetKeyPress('U')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, tuneStep, 0.0f });
-        if (Input::GetKeyPress('G')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, -tuneStep });
-        if (Input::GetKeyPress('T')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, tuneStep });
-        if (Input::GetKeyPress('Z')) m_WeaponSocket->AdjustLocalRotation({ -tuneRotStep, 0.0f, 0.0f });
-        if (Input::GetKeyPress('X')) m_WeaponSocket->AdjustLocalRotation({ tuneRotStep, 0.0f, 0.0f });
-        if (Input::GetKeyPress('C')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, -tuneRotStep, 0.0f });
-        if (Input::GetKeyPress('V')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, tuneRotStep, 0.0f });
-        if (Input::GetKeyPress('B')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, -tuneRotStep });
-        if (Input::GetKeyPress('M')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, tuneRotStep });
-    }
+    // The socket holds the offset now, in every state - nothing overwrites
+    // it per frame, so tuning works while idle, mid-swing or frozen alike.
+    if (Input::GetKeyPress('H')) m_WeaponSocket->AdjustLocalPosition({ -tuneStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('K')) m_WeaponSocket->AdjustLocalPosition({ tuneStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('N')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, -tuneStep, 0.0f });
+    if (Input::GetKeyPress('U')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, tuneStep, 0.0f });
+    if (Input::GetKeyPress('G')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, -tuneStep });
+    if (Input::GetKeyPress('T')) m_WeaponSocket->AdjustLocalPosition({ 0.0f, 0.0f, tuneStep });
+    if (Input::GetKeyPress('Z')) m_WeaponSocket->AdjustLocalRotation({ -tuneRotStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('X')) m_WeaponSocket->AdjustLocalRotation({ tuneRotStep, 0.0f, 0.0f });
+    if (Input::GetKeyPress('C')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, -tuneRotStep, 0.0f });
+    if (Input::GetKeyPress('V')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, tuneRotStep, 0.0f });
+    if (Input::GetKeyPress('B')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, -tuneRotStep });
+    if (Input::GetKeyPress('M')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, tuneRotStep });
 
     if (Input::GetKeyTrigger('P'))
         m_WeaponSocket->DebugPrintTransform();
@@ -329,8 +293,6 @@ void Player::Update()
     if (m_Attacking && m_NextAnimationFrame >= m_AttackAnimLength)
     {
         m_Attacking = false;
-        m_UsingRightAttack = false;
-        m_WeaponSocket->SetLocalTransform(m_IdleWeaponOffsetPos, m_IdleWeaponOffsetRot, { 1.0f, 1.0f, 1.0f });
 
         if (m_AttackQueued)
         {
@@ -382,13 +344,6 @@ void Player::Update()
         m_Blend += 0.1f;
         if (m_Blend > 1.0f)
             m_Blend = 1.0f;
-    }
-
-    // After the frame counter moved, so the swing offset is the one that
-    // belongs to the pose about to be evaluated - not the previous frame's.
-    if (m_Attacking && !m_FreezeAnimation)
-    {
-        UpdateAttackWeaponOffset();
     }
 
     m_AnimationModel->Update(m_AnimationName.c_str(), m_AnimationFrame, m_NextAnimationName.c_str(), m_NextAnimationFrame, m_Blend);
@@ -453,45 +408,6 @@ void Player::DebugDumpSwing(const char* AnimationName, const char* BoneName)
     }
 }
 
-void Player::UpdateAttackWeaponOffset()
-{
-    float progress = (m_AttackAnimLength > 0)
-        ? (float)m_NextAnimationFrame / (float)m_AttackAnimLength
-        : 0.0f;
-    if (progress > 1.0f)
-        progress = 1.0f;
-
-    int segment = (progress < 0.5f) ? 0 : 1;
-    float localT = (segment == 0) ? (progress / 0.5f) : ((progress - 0.5f) / 0.5f);
-
-    Vector3* posArray = m_UsingRightAttack ? m_RightAttackOffsetPos : m_AttackOffsetPos[m_AttackCombo];
-    Vector3* rotArray = m_UsingRightAttack ? m_RightAttackOffsetRot : m_AttackOffsetRot[m_AttackCombo];
-
-    Vector3 pos = posArray[segment] * (1.0f - localT) + posArray[segment + 1] * localT;
-    Vector3 rot = SlerpRotation(rotArray[segment], rotArray[segment + 1], localT);
-
-    m_WeaponSocket->SetLocalTransform(pos, rot, { 1.0f, 1.0f, 1.0f });
-}
-
-Vector3 Player::SlerpRotation(const Vector3& RotA, const Vector3& RotB, float T)
-{
-    XMVECTOR qa = XMQuaternionRotationRollPitchYaw(RotA.x, RotA.y, RotA.z);
-    XMVECTOR qb = XMQuaternionRotationRollPitchYaw(RotB.x, RotB.y, RotB.z);
-
-    // shortest-path: if the two quaternions are on opposite hemispheres
-    // (same visual rotation, opposite sign), negate one so slerp takes
-    // the short way instead of spinning the long way around.
-    if (XMVectorGetX(XMQuaternionDot(qa, qb)) < 0.0f)
-        qb = XMVectorNegate(qb);
-
-    XMVECTOR result = XMQuaternionSlerp(qa, qb, T);
-
-    // Back to Euler in the same order XMQuaternionRotationRollPitchYaw
-    // built them, so interpolating between two tuned offsets returns the
-    // offsets themselves at T = 0 and T = 1 instead of a scrambled pose.
-    return EulerFromQuaternion(result);
-}
-
 void Player::StartAttack()
 {
     m_Weapon->Use(this);
@@ -523,7 +439,6 @@ void Player::StartRightAttack()
 
     m_Weapon->Use(this);
 
-    m_UsingRightAttack = true;
     m_Attacking = true;
 
     SetAnimation("AttackRight");

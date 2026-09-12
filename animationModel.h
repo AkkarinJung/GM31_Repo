@@ -44,7 +44,12 @@ private:
 	std::vector<DEFORM_VERTEX>* m_DeformVertex;//変形後頂点データ
 	std::unordered_map<std::string, BONE> m_Bone;//ボーンデータ（名前で参照）
 
+	// Node transform per mesh index, so a mesh that no bone ever moves can
+	// still be placed the way its FBX node says (see Load).
+	std::vector<aiMatrix4x4> m_MeshTransform;
+
 	void CreateBone(aiNode* Node);
+	void CollectMeshTransforms(aiNode* Node, const aiMatrix4x4& ParentMatrix);
 	void UpdateBoneMatrix(aiNode* Node, aiMatrix4x4 Matrix);
 
 public:

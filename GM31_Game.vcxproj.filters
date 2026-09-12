@@ -261,7 +261,7 @@
       <Filter>Header Files\Enemy</Filter>
     </ClInclude>
     <ClInclude Include="RotationUtil.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\WeaponClass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
