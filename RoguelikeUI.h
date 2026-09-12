@@ -4,25 +4,31 @@
 // Screen-space card display for the start-of-map reward pick.
 //
 // Presentation only: it reads the choices out of RoguelikeSystem and draws
-// one card per choice. It never applies a reward and never changes the
-// selection - the system owns that, and the system is what reads the keys.
-// The project has no font, so a card shows its number (the key to press)
-// and the reward amount using the same digit spritesheet as Score and
-// DamageNumber; the full reward names go to the debug output.
+// one card per choice. It never applies a reward and never decides the
+// selection - the system owns that. The card art comes from one sprite
+// sheet and the labels from the baked Font, so nothing here knows what a
+// reward actually does.
 class RoguelikeUI : public GameObject
 {
 private:
     class RoguelikeSystem* m_System = nullptr;
 
     int m_HoveredIndex = -1; // card under the cursor, -1 when none
+
     ID3D11Buffer* m_VertexBuffer = nullptr;
     ID3D11InputLayout* m_VertexLayout = nullptr;
     ID3D11VertexShader* m_VertexShader = nullptr;
     ID3D11PixelShader* m_PixelShader = nullptr;
     ID3D11ShaderResourceView* m_Texture = nullptr;
 
-    void DrawQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color);
-    void DrawNumber(int Value, float CenterX, float Y, float DigitSize, const XMFLOAT4& Color);
+    // Font::Draw binds its own buffer and shaders, so anything drawn after
+    // text has to bind again - every quad below does it for itself.
+    void BindPipeline();
+    void DrawFlatQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color);
+    void DrawSprite(const struct SpriteRect& Source, float X, float Y, float Width, float Height,
+        const XMFLOAT4& Color);
+    void DrawWrapped(const char* Text, float CenterX, float Y, float MaxWidth, float Size,
+        const XMFLOAT4& Color);
 
     // One place that decides where a card sits - both the drawing and the
     // mouse hit test read it, so they can never disagree.
@@ -34,7 +40,9 @@ public:
     void Draw() override;
 
     void SetSystem(class RoguelikeSystem* System);
+
+    // Which card is at this screen position, or -1 for none. The layout
+    // lives here; the decision to take that card stays in RoguelikeSystem.
     int GetCardIndexAt(float X, float Y) const;
     void SetHoveredIndex(int Index) { m_HoveredIndex = Index; }
 };
-

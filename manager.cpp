@@ -7,6 +7,7 @@
 #include "Game.h"
 #include "Result.h"
 #include "audio.h"
+#include "Font.h"
 
 #include "GameObject.h"
 
@@ -22,6 +23,7 @@ void Manager::Init()
 	Renderer::Init();
 	Input::Init();
 	Audio::InitMaster();
+	Font::Init(L"asset\\font\\kenvector_future.ttf", L"KenVector Future", 48);
 
 	ChangeScene<Title>(0.0f);
 }
@@ -41,6 +43,7 @@ void Manager::Uninit()
 	}
 	m_GameObjects.clear();
 
+	Font::Uninit();
 	Audio::UninitMaster();
 	Renderer::Uninit();
 	Input::Uninit();

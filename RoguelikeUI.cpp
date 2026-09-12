@@ -2,15 +2,35 @@
 #include "renderer.h"
 #include "RoguelikeUI.h"
 #include "RoguelikeSystem.h"
+#include "Font.h"
 
-#define SPRITE_ROW (5)
-#define SPRITE_COLUMNS (5)
+// A piece of asset\texture\Simple_card_Design.png, in pixels of that sheet.
+struct SpriteRect
+{
+    float X, Y, Width, Height;
+};
 
-// Card layout, in screen pixels.
+static const float SHEET_WIDTH = 1536.0f;
+static const float SHEET_HEIGHT = 1024.0f;
+
+// Frames and icons come in matching colours - blue reads as "you", gold as
+// "your weapon", which is the only difference a player has to notice.
+static const SpriteRect CARD_COMMON = { 1008.0f, 108.0f, 240.0f, 289.0f }; // blue frame
+static const SpriteRect CARD_WEAPON = { 1008.0f, 425.0f, 240.0f, 292.0f }; // gold frame
+static const SpriteRect ICON_COMMON = { 1357.0f, 304.0f,  99.0f,  99.0f }; // blue diamond
+static const SpriteRect ICON_WEAPON = { 1354.0f, 550.0f, 105.0f, 106.0f }; // gold diamond
+static const SpriteRect BANNER      = {   64.0f, 827.0f, 800.0f,  77.0f };
+
+// Card layout, in screen pixels. The art is 240x289, so the card keeps that
+// shape - stretching it would soften the border.
 static const float CARD_WIDTH = 260.0f;
-static const float CARD_HEIGHT = 320.0f;
-static const float CARD_GAP = 30.0f;
-static const float CARD_TOP = 200.0f;
+static const float CARD_HEIGHT = 313.0f;
+static const float CARD_GAP = 36.0f;
+static const float CARD_TOP = 210.0f;
+
+// The frame art has a darker panel across its bottom third - the reward
+// name goes in there, everything else above it.
+static const float FOOTER_START = 0.70f;
 
 void RoguelikeUI::Init()
 {
@@ -36,7 +56,7 @@ void RoguelikeUI::Init()
 
     TexMetadata metadata;
     ScratchImage image;
-    LoadFromWICFile(L"asset\\texture\\number.png", WIC_FLAGS_NONE, &metadata, image);
+    LoadFromWICFile(L"asset\\texture\\Simple_card_Design.png", WIC_FLAGS_NONE, &metadata, image);
     CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
         image.GetImageCount(), metadata, &m_Texture);
     assert(m_Texture);
@@ -55,13 +75,11 @@ void RoguelikeUI::SetSystem(RoguelikeSystem* System)
 {
     m_System = System;
 
-    // No font in the project, so the readable version of the cards goes to
-    // the debug output - handy while tuning the reward pool.
     if (m_System == nullptr)
         return;
 
     char buffer[256];
-    OutputDebugStringA("=== Roguelike: choose a reward ===\n");
+    OutputDebugStringA("=== Roguelike: click a reward ===\n");
 
     const std::vector<RoguelikeReward>& choices = m_System->GetChoices();
     for (int i = 0; i < (int)choices.size(); i++)
@@ -73,8 +91,25 @@ void RoguelikeUI::SetSystem(RoguelikeSystem* System)
     }
 }
 
-void RoguelikeUI::DrawQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color)
+void RoguelikeUI::BindPipeline()
 {
+    Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
+    Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
+    Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
+
+    Renderer::SetWorldViewProjection2D();
+    Renderer::SetWorldMatrix(XMMatrixIdentity());
+
+    UINT stride = sizeof(VERTEX_3D);
+    UINT offset = 0;
+    Renderer::GetDeviceContext()->IASetVertexBuffers(0, 1, &m_VertexBuffer, &stride, &offset);
+    Renderer::GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+}
+
+void RoguelikeUI::DrawFlatQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color)
+{
+    BindPipeline();
+
     MATERIAL material{};
     material.Diffuse = Color;
     material.TextureEnable = false;
@@ -111,8 +146,11 @@ void RoguelikeUI::DrawQuad(float X, float Y, float Width, float Height, const XM
     Renderer::GetDeviceContext()->Draw(4, 0);
 }
 
-void RoguelikeUI::DrawNumber(int Value, float CenterX, float Y, float DigitSize, const XMFLOAT4& Color)
+void RoguelikeUI::DrawSprite(const SpriteRect& Source, float X, float Y, float Width, float Height,
+    const XMFLOAT4& Color)
 {
+    BindPipeline();
+
     MATERIAL material{};
     material.Diffuse = Color;
     material.TextureEnable = true;
@@ -120,58 +158,89 @@ void RoguelikeUI::DrawNumber(int Value, float CenterX, float Y, float DigitSize,
 
     Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &m_Texture);
 
-    const float w = 1.0f / (float)SPRITE_COLUMNS;
-    const float h = 1.0f / (float)SPRITE_ROW;
+    // pixels in the sheet -> 0-1 texture coordinates
+    float u = Source.X / SHEET_WIDTH;
+    float v = Source.Y / SHEET_HEIGHT;
+    float uWidth = Source.Width / SHEET_WIDTH;
+    float vHeight = Source.Height / SHEET_HEIGHT;
 
-    // up to 3 digits, least-significant first
-    int number = Value < 0 ? -Value : Value;
-    int digits[3];
-    int digitCount = 0;
-    do
+    D3D11_MAPPED_SUBRESOURCE msr{};
+    if (SUCCEEDED(Renderer::GetDeviceContext()->Map(m_VertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr)))
     {
-        digits[digitCount++] = number % 10;
-        number /= 10;
-    } while (number > 0 && digitCount < 3);
+        VERTEX_3D* vertex = (VERTEX_3D*)msr.pData;
 
-    float startX = CenterX - (DigitSize * digitCount) * 0.5f;
+        vertex[0].Position = XMFLOAT3(X, Y, 0.0f);
+        vertex[0].Normal = XMFLOAT3(0, 0, 0);
+        vertex[0].Diffuse = XMFLOAT4(1, 1, 1, 1);
+        vertex[0].TexCoord = XMFLOAT2(u, v);
 
-    for (int i = 0; i < digitCount; i++)
-    {
-        int digit = digits[digitCount - 1 - i]; // most-significant first
-        float u = (digit % SPRITE_COLUMNS) * w;
-        float v = (digit / SPRITE_COLUMNS) * h;
-        float x = startX + i * DigitSize;
+        vertex[1].Position = XMFLOAT3(X + Width, Y, 0.0f);
+        vertex[1].Normal = XMFLOAT3(0, 0, 0);
+        vertex[1].Diffuse = XMFLOAT4(1, 1, 1, 1);
+        vertex[1].TexCoord = XMFLOAT2(u + uWidth, v);
 
-        D3D11_MAPPED_SUBRESOURCE msr{};
-        if (SUCCEEDED(Renderer::GetDeviceContext()->Map(m_VertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr)))
-        {
-            VERTEX_3D* vertex = (VERTEX_3D*)msr.pData;
+        vertex[2].Position = XMFLOAT3(X, Y + Height, 0.0f);
+        vertex[2].Normal = XMFLOAT3(0, 0, 0);
+        vertex[2].Diffuse = XMFLOAT4(1, 1, 1, 1);
+        vertex[2].TexCoord = XMFLOAT2(u, v + vHeight);
 
-            vertex[0].Position = XMFLOAT3(x, Y, 0.0f);
-            vertex[0].Normal = XMFLOAT3(0, 0, 0);
-            vertex[0].Diffuse = XMFLOAT4(1, 1, 1, 1);
-            vertex[0].TexCoord = XMFLOAT2(u, v);
+        vertex[3].Position = XMFLOAT3(X + Width, Y + Height, 0.0f);
+        vertex[3].Normal = XMFLOAT3(0, 0, 0);
+        vertex[3].Diffuse = XMFLOAT4(1, 1, 1, 1);
+        vertex[3].TexCoord = XMFLOAT2(u + uWidth, v + vHeight);
 
-            vertex[1].Position = XMFLOAT3(x + DigitSize, Y, 0.0f);
-            vertex[1].Normal = XMFLOAT3(0, 0, 0);
-            vertex[1].Diffuse = XMFLOAT4(1, 1, 1, 1);
-            vertex[1].TexCoord = XMFLOAT2(u + w, v);
-
-            vertex[2].Position = XMFLOAT3(x, Y + DigitSize, 0.0f);
-            vertex[2].Normal = XMFLOAT3(0, 0, 0);
-            vertex[2].Diffuse = XMFLOAT4(1, 1, 1, 1);
-            vertex[2].TexCoord = XMFLOAT2(u, v + h);
-
-            vertex[3].Position = XMFLOAT3(x + DigitSize, Y + DigitSize, 0.0f);
-            vertex[3].Normal = XMFLOAT3(0, 0, 0);
-            vertex[3].Diffuse = XMFLOAT4(1, 1, 1, 1);
-            vertex[3].TexCoord = XMFLOAT2(u + w, v + h);
-
-            Renderer::GetDeviceContext()->Unmap(m_VertexBuffer, 0);
-        }
-
-        Renderer::GetDeviceContext()->Draw(4, 0);
+        Renderer::GetDeviceContext()->Unmap(m_VertexBuffer, 0);
     }
+
+    Renderer::GetDeviceContext()->Draw(4, 0);
+}
+
+void RoguelikeUI::DrawWrapped(const char* Text, float CenterX, float Y, float MaxWidth, float Size,
+    const XMFLOAT4& Color)
+{
+    // Greedy wrap: keep adding words while the line still fits, then start
+    // a new one. Reward names are short, so nothing fancier is needed.
+    char line[128] = "";
+    char candidate[128];
+    char word[64];
+
+    int lineLength = 0;
+    float lineY = Y;
+
+    const char* p = Text;
+
+    while (*p != '\0')
+    {
+        while (*p == ' ')
+            p++;
+
+        int wordLength = 0;
+        while (*p != '\0' && *p != ' ' && wordLength < 63)
+            word[wordLength++] = *p++;
+        word[wordLength] = '\0';
+
+        if (wordLength == 0)
+            break;
+
+        if (lineLength > 0)
+            sprintf_s(candidate, "%s %s", line, word);
+        else
+            sprintf_s(candidate, "%s", word);
+
+        if (lineLength == 0 || Font::Measure(candidate, Size) <= MaxWidth)
+        {
+            lineLength = sprintf_s(line, "%s", candidate);
+        }
+        else
+        {
+            Font::DrawCentered(line, CenterX, lineY, Size, Color);
+            lineY += Size * 1.15f;
+            lineLength = sprintf_s(line, "%s", word);
+        }
+    }
+
+    if (lineLength > 0)
+        Font::DrawCentered(line, CenterX, lineY, Size, Color);
 }
 
 void RoguelikeUI::GetCardRect(int Index, int Count, float& X, float& Y, float& Width, float& Height) const
@@ -215,60 +284,51 @@ void RoguelikeUI::Draw()
     if (count <= 0)
         return;
 
-    Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
-    Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
-    Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
-
-    Renderer::SetWorldViewProjection2D();
-    Renderer::SetWorldMatrix(XMMatrixIdentity());
-
-    UINT stride = sizeof(VERTEX_3D);
-    UINT offset = 0;
-    Renderer::GetDeviceContext()->IASetVertexBuffers(0, 1, &m_VertexBuffer, &stride, &offset);
-    Renderer::GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    const XMFLOAT4 white = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
     // dim the map behind the cards
-    DrawQuad(0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, XMFLOAT4(0.0f, 0.0f, 0.0f, 0.6f));
+    DrawFlatQuad(0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT,
+        XMFLOAT4(0.0f, 0.0f, 0.0f, 0.65f));
 
-    float totalWidth = count * CARD_WIDTH + (count - 1) * CARD_GAP;
-    float startX = (SCREEN_WIDTH - totalWidth) * 0.5f;
+    // title banner
+    DrawSprite(BANNER, SCREEN_WIDTH * 0.5f - 300.0f, 110.0f, 600.0f, 58.0f, white);
+    Font::DrawCentered("CHOOSE A REWARD", SCREEN_WIDTH * 0.5f, 124.0f, 30.0f, white);
 
     for (int i = 0; i < count; i++)
     {
         const RoguelikeReward& reward = choices[i];
 
         bool common = reward.Category == RewardCategory::Common;
-        XMFLOAT4 categoryColor = common
-            ? XMFLOAT4(0.25f, 0.55f, 0.95f, 1.0f)  // Common - blue
-            : XMFLOAT4(0.90f, 0.35f, 0.25f, 1.0f); // Weapon - orange/red
+        const SpriteRect& frame = common ? CARD_COMMON : CARD_WEAPON;
+        const SpriteRect& icon = common ? ICON_COMMON : ICON_WEAPON;
 
         float x, y, width, height;
         GetCardRect(i, count, x, y, width, height);
 
-        bool hovered = (i == m_HoveredIndex);
+        // The hovered card grows a little around its centre - the frame art
+        // already glows, so a lift is enough to read as "this one".
+        if (i == m_HoveredIndex)
+        {
+            float grow = 12.0f;
+            x -= grow * 0.5f;
+            y -= grow * 0.5f;
+            width += grow;
+            height += grow;
+        }
 
-        // hovered card gets a colored outline and a lighter body, so the
-        // cursor makes it obvious what a click would take
-        if (hovered)
-            DrawQuad(x - 6.0f, y - 6.0f, width + 12.0f, height + 12.0f, categoryColor);
+        DrawSprite(frame, x, y, width, height, white);
 
-        XMFLOAT4 bodyColor = hovered
-            ? XMFLOAT4(0.18f, 0.18f, 0.24f, 1.0f)
-            : XMFLOAT4(0.10f, 0.10f, 0.14f, 0.95f);
+        float centerX = x + width * 0.5f;
+        float footerY = y + height * FOOTER_START;
 
-        DrawQuad(x, y, width, height, bodyColor);                              // card body
-        DrawQuad(x + 6.0f, y + 6.0f, width - 12.0f, 60.0f, categoryColor);     // category header
+        // category icon, sitting in the open upper part of the frame
+        float iconSize = width * 0.34f;
+        DrawSprite(icon, centerX - iconSize * 0.5f, y + height * 0.16f, iconSize, iconSize, white);
 
-        // the amount: a percent reward shows its percentage (0.15f -> 15)
-        int amount = reward.Percent ? (int)(reward.Value * 100.0f + 0.5f) : (int)reward.Value;
-        DrawNumber(amount, x + width * 0.5f, y + 130.0f, 60.0f, XMFLOAT4(1, 1, 1, 1));
+        Font::DrawCentered(common ? "COMMON" : "WEAPON", centerX, y + height * 0.52f, 20.0f,
+            XMFLOAT4(0.75f, 0.78f, 0.85f, 1.0f));
 
-        // no '%' glyph in the spritesheet - a bar under the number marks a
-        // percentage reward, nothing under it means a flat amount
-        if (reward.Percent)
-            DrawQuad(x + width * 0.5f - 40.0f, y + 200.0f, 80.0f, 6.0f, categoryColor);
-
-        // card number - matches the list printed to the debug output
-        DrawNumber(i + 1, x + width * 0.5f, y + height - 80.0f, 40.0f, categoryColor);
+        // the reward name, wrapped inside the darker footer panel
+        DrawWrapped(reward.Name, centerX, footerY + 18.0f, width - 34.0f, 21.0f, white);
     }
 }
