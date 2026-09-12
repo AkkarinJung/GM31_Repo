@@ -161,7 +161,11 @@ void Player::Update()
     if (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f)
         m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
 
-    if (Input::GetKeyTrigger(VK_SPACE))
+    // oldGround, not m_Ground: m_Ground was cleared at the top of Update and
+    // is not recomputed until after the position integration below, so it is
+    // always false here. oldGround is what the player stood on last frame -
+    // without this check every press adds jump speed, mid-air included.
+    if (oldGround && Input::GetKeyTrigger(VK_SPACE))
     {
         m_Velocity.y += m_JumpPower;
 

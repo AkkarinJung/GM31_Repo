@@ -190,7 +190,7 @@ void RoguelikeSystem::ApplyWeapon(const RoguelikeReward& Reward)
     switch ((WeaponStat)Reward.Stat)
     {
     case WeaponStat::Damage:
-        weapon->SetDamage(weapon->GetDamage() * (1.0f + Reward.Value));
+        weapon->SetDamageMultiplier(weapon->GetDamageMultiplier() * (1.0f + Reward.Value));
         break;
 
     case WeaponStat::AttackSpeed:

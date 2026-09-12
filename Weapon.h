@@ -21,6 +21,12 @@ protected:
 
     virtual void LoadModel() {}; // derived class loads its own mesh here
 
+   // Scales the whole swing, not just m_Damage. The weapon's own damage is
+   // small next to the wielder's Attack, so a percentage reward applied to
+   // m_Damage alone rounds away to nothing - this makes "+15% damage" mean
+   // 15% of what the swing actually deals.
+    float m_DamageMultiplier = 1.0f;
+
 public:
     void Init() override;
     void Uninit() override;
@@ -37,5 +43,7 @@ public:
     void SetRange(float Range) { m_Range = Range; }
     float GetCriticalDamage() const { return m_CriticalDamage; }
     void SetCriticalDamage(float CriticalDamage) { m_CriticalDamage = CriticalDamage; }
+    float GetDamageMultiplier() const { return m_DamageMultiplier; }
+    void SetDamageMultiplier(float DamageMultiplier) { m_DamageMultiplier = DamageMultiplier; }
     bool CanUse() const { return m_CooldownTimer <= 0.0f; }
 };

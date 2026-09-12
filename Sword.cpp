@@ -34,10 +34,20 @@ void Sword::Use(GameObject* Owner)
     forward.normalize();
 
     Stats* ownerStats = Owner->GetGameComponent<Stats>();
-    int attackPower = (int)m_Damage + (ownerStats != nullptr ? ownerStats->GetAttack() : 0);
+
+    // All of this stays in float until the very end. Rounding to int at each
+    // step threw away every percentage reward: +15% of 3.0 damage is 0.45,
+    // which (int) truncated straight back to the original number.
+    float damage = m_Damage + (ownerStats != nullptr ? (float)ownerStats->GetAttack() : 0.0f);
+    damage *= m_DamageMultiplier;
+
     float criticalChance = ownerStats != nullptr ? ownerStats->GetCriticalChance() : 0.0f;
     if ((float)rand() / RAND_MAX < criticalChance)
-        attackPower = (int)(attackPower * m_CriticalDamage);
+        damage *= m_CriticalDamage;
+
+    int attackPower = (int)(damage + 0.5f); // round, don't truncate
+    if (attackPower < 1)
+        attackPower = 1;
 
     auto enemies = Manager::GetGameObjs<Enemy>();
     for (auto enemy : enemies)
