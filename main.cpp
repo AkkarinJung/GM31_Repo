@@ -51,7 +51,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 	CoInitializeEx(nullptr, COINITBASE_MULTITHREADED);
 
-
+	srand((unsigned int)timeGetTime());
 	Manager::Init();
 
 

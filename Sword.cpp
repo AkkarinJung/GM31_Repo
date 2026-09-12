@@ -35,6 +35,9 @@ void Sword::Use(GameObject* Owner)
 
     Stats* ownerStats = Owner->GetGameComponent<Stats>();
     int attackPower = (int)m_Damage + (ownerStats != nullptr ? ownerStats->GetAttack() : 0);
+    float criticalChance = ownerStats != nullptr ? ownerStats->GetCriticalChance() : 0.0f;
+    if ((float)rand() / RAND_MAX < criticalChance)
+        attackPower = (int)(attackPower * m_CriticalDamage);
 
     auto enemies = Manager::GetGameObjs<Enemy>();
     for (auto enemy : enemies)

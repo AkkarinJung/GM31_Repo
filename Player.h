@@ -14,6 +14,10 @@ private:
 
     bool m_Ground = true;
     float m_MoveAnimation = 0.0f;
+    // Movement tuning. Fields rather than literals in Update() so the
+    // start-of-map rewards can scale them (see RoguelikeSystem).
+    float m_MoveSpeed = 50.0f;
+    float m_JumpPower = 20.0f;
     class Audio* m_JumpSE;
 
     GameObject* m_Child;
@@ -64,6 +68,14 @@ public:
     void Draw() override;
 
     void SetAnimation(const char* AnimationName);
+    // Read/written by the roguelike rewards.
+    float GetMoveSpeed() const { return m_MoveSpeed; }
+    void SetMoveSpeed(float MoveSpeed) { m_MoveSpeed = MoveSpeed; }
+
+    float GetJumpPower() const { return m_JumpPower; }
+    void SetJumpPower(float JumpPower) { m_JumpPower = JumpPower; }
+
+    class Weapon* GetWeapon() const;
 
     void DebugDumpSwing(const char* AnimationName, const char* BoneName);
 };

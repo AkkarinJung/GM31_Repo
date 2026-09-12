@@ -12,6 +12,8 @@ protected:
     float m_Damage = 1.0f;
     float m_Cooldown = 0.3f;
     float m_CooldownTimer = 0.0f;
+    float m_Range = 2.0f;          // how far the weapon reaches
+    float m_CriticalDamage = 1.5f; // damage multiplier on a critical 
 
     ID3D11InputLayout* m_VertexLayout = nullptr;
     ID3D11VertexShader* m_VertexShader = nullptr;
@@ -29,6 +31,11 @@ public:
 
     float GetDamage() const { return m_Damage; }
     void SetDamage(float Damage) { m_Damage = Damage; }
+    float GetCooldown() const { return m_Cooldown; }
     void SetCooldown(float Cooldown) { m_Cooldown = Cooldown; }
+    float GetRange() const { return m_Range; }
+    void SetRange(float Range) { m_Range = Range; }
+    float GetCriticalDamage() const { return m_CriticalDamage; }
+    void SetCriticalDamage(float CriticalDamage) { m_CriticalDamage = CriticalDamage; }
     bool CanUse() const { return m_CooldownTimer <= 0.0f; }
 };

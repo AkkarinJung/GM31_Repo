@@ -14,6 +14,7 @@ std::list<GameObject*> Manager::m_GameObjects;
 Scene* Manager::m_Scene = nullptr;
 Scene* Manager::m_NextScene = nullptr;
 float Manager::m_ChangeTime = 0.0f;
+bool Manager::m_Pause = false;
 
 
 void Manager::Init()
@@ -53,17 +54,20 @@ void Manager::Update()
 	if(m_Scene != nullptr)
 	m_Scene->Update();
 
-	for (GameObject* obj : m_GameObjects) 
+	if (!m_Pause)
 	{
-		if (obj != nullptr) {
-			obj->Update();
-		}
-	}
-
-	m_GameObjects.remove_if([](GameObject* object)
+		for (GameObject* obj : m_GameObjects)
 		{
-			return object->Destory();
-		});
+			if (obj != nullptr) {
+				obj->Update();
+			}
+		}
+
+		m_GameObjects.remove_if([](GameObject* object)
+			{
+				return object->Destory();
+			});
+	}
 
 	if (m_NextScene != nullptr)
 	{
@@ -86,6 +90,7 @@ void Manager::Update()
 			}
 
 			m_GameObjects.clear();
+			m_Pause = false; // a new scene never starts paused
 
 			m_Scene = m_NextScene;
 			m_Scene->Init();

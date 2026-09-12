@@ -14,6 +14,7 @@ private:
     int m_MP = 50;
     int m_Attack = 10;
     int m_Defense = 0;
+    float m_CriticalChance = 0.0f; // 0.0f = never crits; rewards raise it
 
 public:
     using Component::Component;
@@ -24,12 +25,14 @@ public:
     int GetMaxMP() const { return m_MaxMP; }
     int GetAttack() const { return m_Attack; }
     int GetDefense() const { return m_Defense; }
+    float GetCriticalChance() const { return m_CriticalChance; }
 
     void SetMaxHP(int MaxHP) { m_MaxHP = MaxHP; m_HP = MaxHP; }
     void SetMaxMP(int MaxMP) { m_MaxMP = MaxMP; m_MP = MaxMP; }
 
     void SetAttack(int Attack) { m_Attack = Attack; }
     void SetDefense(int Defense) { m_Defense = Defense; }
+    void SetCriticalChance(float CriticalChance) { m_CriticalChance = CriticalChance; }
 
     bool IsDead() const { return m_HP <= 0; }
 

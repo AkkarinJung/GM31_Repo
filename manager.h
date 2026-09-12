@@ -9,12 +9,18 @@ private:
 	static Scene* m_Scene;
 	static Scene* m_NextScene;
 	static float m_ChangeTime;
+	static bool m_Pause;
 
 public:
 	static void Init();
 	static void Uninit();
 	static void Update();
 	static void Draw();
+	// Freezes every GameObject's Update. The current Scene keeps updating,
+	// so whatever paused the game (the start-of-map reward pick) can still
+	// read input and unpause itself. Cleared on every scene change.
+	static void SetPause(bool Pause) { m_Pause = Pause; }
+	static bool IsPause() { return m_Pause; }
 
 	template<typename T>
 	static void ChangeScene(float time)

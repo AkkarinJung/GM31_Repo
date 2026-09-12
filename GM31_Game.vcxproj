@@ -45,6 +45,8 @@
     <ClCompile Include="Polygon2D.cpp" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="Result.cpp" />
+    <ClCompile Include="RoguelikeSystem.cpp" />
+    <ClCompile Include="RoguelikeUI.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
@@ -84,6 +86,9 @@
     <ClInclude Include="Polygon2D.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="Result.h" />
+    <ClInclude Include="RoguelikeReward.h" />
+    <ClInclude Include="RoguelikeSystem.h" />
+    <ClInclude Include="RoguelikeUI.h" />
     <ClInclude Include="RotationUtil.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Score.h" />

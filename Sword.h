@@ -7,7 +7,6 @@ private:
     //class ModelRenderer* m_ModelRenderer = nullptr;
     class AnimationModel* m_AnimationModel = nullptr;
 
-    float m_Range = 2.0f;
     float m_AngleDot = 0.5f; // cos of half the swing arc - enemies in front only
 
 protected:

@@ -123,12 +123,12 @@ void Player::Update()
     {
         if (Input::GetKeyPress('D'))
         {
-            m_Velocity.x += 50.0f * dt;
+            m_Velocity.x += m_MoveSpeed * dt;
             move = true;
         }
         if (Input::GetKeyPress('A'))
         {
-            m_Velocity.x -= 50.0f * dt;
+            m_Velocity.x -= m_MoveSpeed * dt;
             move = true;
         }
     }
@@ -163,7 +163,7 @@ void Player::Update()
 
     if (Input::GetKeyTrigger(VK_SPACE))
     {
-        m_Velocity.y += 20.0f;
+        m_Velocity.y += m_JumpPower;
 
         //m_Scale.y = 2.0f;
         //m_Scale.x = 0.5f;
@@ -375,6 +375,11 @@ void Player::SetAnimation(const char* AnimationName)
 
         m_Blend = 0.0f;
     }
+}
+
+Weapon* Player::GetWeapon() const
+{
+    return m_Weapon;
 }
 
 void Player::DebugDumpSwing(const char* AnimationName, const char* BoneName)
