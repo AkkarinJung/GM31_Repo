@@ -11,6 +11,8 @@ private:
 
 	ID3D11ShaderResourceView* m_Texture;
 
+	float m_RotationSpeed = 0.015f;	// ƒ‰ƒWƒAƒ“–ˆ•bAˆêü‚¨‚æ‚»7•ª
+
 public:
 	void Init();
 	void Uninit();

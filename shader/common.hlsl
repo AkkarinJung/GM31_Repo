@@ -19,7 +19,10 @@ cbuffer CameraBuffer : register(b5)
 	float4 CameraPosition;
 }
 
-
+cbuffer ParameterBuffer : register(b6)
+{
+    float4 Parameter;
+}
 
 
 struct MATERIAL
@@ -73,4 +76,13 @@ struct PS_IN
 	float4 Position		: SV_POSITION;
 	float4 Diffuse		: COLOR0;
 	float2 TexCoord		: TEXCOORD0;
+};
+
+struct TOON_PS_IN
+{
+    float4 Position : SV_POSITION;
+    float4 Normal : NORMAL0;
+    float4 Diffuse : COLOR0;
+    float2 TexCoord : TEXCOORD0;
+    float4 WorldPosition : TEXCOORD1;
 };

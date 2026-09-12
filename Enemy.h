@@ -30,6 +30,12 @@ private:
     ID3D11VertexShader* m_VertexShader = nullptr;
     ID3D11PixelShader* m_PixelShader = nullptr;
 
+    // Toon ramp texture, sampled at t1 by toonPS
+    ID3D11ShaderResourceView* m_RampTexture = nullptr;
+
+    // x = ramp row, y = edge threshold, z = edge darkening
+    XMFLOAT4 m_Parameter{ 0.125f, -0.35f, 0.3f, 0.15f };
+
     class ModelRenderer* m_ModelRenderer;
 
     Vector3 m_Shake;
