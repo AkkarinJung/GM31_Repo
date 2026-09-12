@@ -11,8 +11,7 @@
 
 // The reward pool. This table is the only thing that has to change to add,
 // remove or retune a reward - everything below just reads it.
-//false ¨ flat amount. 5.0f means "+5".
-//true ¨ ratio. 0.20f means "+20%".
+// 4th arg: false = flat amount (5.0f -> "+5"), true = ratio (0.20f -> "+20%")
 static const RoguelikeReward s_RewardPool[] =
 {
     CommonReward(CommonStat::MaxHP,          20.0f, false, "+20 Max HP"),
@@ -60,17 +59,21 @@ void RoguelikeSystem::Start(Player* Owner, int ChoiceCount)
 
 void RoguelikeSystem::Update()
 {
-    if (m_State != State::Selecting)
+    if (m_State != State::Selecting || m_UI == nullptr)
         return;
 
-    // 1, 2, 3, ... - one key per card.
-    for (int i = 0; i < (int)m_Choices.size(); i++)
+    // The UI owns the card layout, so it answers which card the cursor is
+    // over - taking it stays this system's decision.
+    int hovered = m_UI->GetCardIndexAt(Input::GetMouseX(), Input::GetMouseY());
+    m_UI->SetHoveredIndex(hovered);
+
+    if (hovered >= 0 && Input::GetKeyTrigger(VK_LBUTTON))
     {
-        if (Input::GetKeyTrigger((BYTE)('1' + i)))
-        {
-            SelectReward(i);
-            return;
-        }
+        // Swallow the click. Gameplay resumes on this same frame and the
+        // player also attacks on a left click - without this the pick would
+        // start the map with a swing.
+        Input::ConsumeKeyTrigger(VK_LBUTTON);
+        SelectReward(hovered);
     }
 }
 

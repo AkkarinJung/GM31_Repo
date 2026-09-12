@@ -13,7 +13,7 @@ protected:
     float m_Cooldown = 0.3f;
     float m_CooldownTimer = 0.0f;
     float m_Range = 2.0f;          // how far the weapon reaches
-    float m_CriticalDamage = 1.5f; // damage multiplier on a critical 
+    float m_CriticalDamage = 1.5f; // damage multiplier on a critical hit
 
     ID3D11InputLayout* m_VertexLayout = nullptr;
     ID3D11VertexShader* m_VertexShader = nullptr;

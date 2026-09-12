@@ -174,6 +174,37 @@ void RoguelikeUI::DrawNumber(int Value, float CenterX, float Y, float DigitSize,
     }
 }
 
+void RoguelikeUI::GetCardRect(int Index, int Count, float& X, float& Y, float& Width, float& Height) const
+{
+    float totalWidth = Count * CARD_WIDTH + (Count - 1) * CARD_GAP;
+    float startX = (SCREEN_WIDTH - totalWidth) * 0.5f;
+
+    X = startX + Index * (CARD_WIDTH + CARD_GAP);
+    Y = CARD_TOP;
+    Width = CARD_WIDTH;
+    Height = CARD_HEIGHT;
+}
+
+int RoguelikeUI::GetCardIndexAt(float X, float Y) const
+{
+    if (m_System == nullptr)
+        return -1;
+
+    int count = (int)m_System->GetChoices().size();
+
+    for (int i = 0; i < count; i++)
+    {
+        float cardX, cardY, cardWidth, cardHeight;
+        GetCardRect(i, count, cardX, cardY, cardWidth, cardHeight);
+
+        if (X >= cardX && X <= cardX + cardWidth &&
+            Y >= cardY && Y <= cardY + cardHeight)
+            return i;
+    }
+
+    return -1;
+}
+
 void RoguelikeUI::Draw()
 {
     if (m_System == nullptr || !m_System->IsSelecting())
@@ -211,21 +242,33 @@ void RoguelikeUI::Draw()
             ? XMFLOAT4(0.25f, 0.55f, 0.95f, 1.0f)  // Common - blue
             : XMFLOAT4(0.90f, 0.35f, 0.25f, 1.0f); // Weapon - orange/red
 
-        float x = startX + i * (CARD_WIDTH + CARD_GAP);
+        float x, y, width, height;
+        GetCardRect(i, count, x, y, width, height);
 
-        DrawQuad(x, CARD_TOP, CARD_WIDTH, CARD_HEIGHT, XMFLOAT4(0.10f, 0.10f, 0.14f, 0.95f));       // card body
-        DrawQuad(x + 6.0f, CARD_TOP + 6.0f, CARD_WIDTH - 12.0f, 60.0f, categoryColor);              // category header
+        bool hovered = (i == m_HoveredIndex);
+
+        // hovered card gets a colored outline and a lighter body, so the
+        // cursor makes it obvious what a click would take
+        if (hovered)
+            DrawQuad(x - 6.0f, y - 6.0f, width + 12.0f, height + 12.0f, categoryColor);
+
+        XMFLOAT4 bodyColor = hovered
+            ? XMFLOAT4(0.18f, 0.18f, 0.24f, 1.0f)
+            : XMFLOAT4(0.10f, 0.10f, 0.14f, 0.95f);
+
+        DrawQuad(x, y, width, height, bodyColor);                              // card body
+        DrawQuad(x + 6.0f, y + 6.0f, width - 12.0f, 60.0f, categoryColor);     // category header
 
         // the amount: a percent reward shows its percentage (0.15f -> 15)
         int amount = reward.Percent ? (int)(reward.Value * 100.0f + 0.5f) : (int)reward.Value;
-        DrawNumber(amount, x + CARD_WIDTH * 0.5f, CARD_TOP + 130.0f, 60.0f, XMFLOAT4(1, 1, 1, 1));
+        DrawNumber(amount, x + width * 0.5f, y + 130.0f, 60.0f, XMFLOAT4(1, 1, 1, 1));
 
         // no '%' glyph in the spritesheet - a bar under the number marks a
         // percentage reward, nothing under it means a flat amount
         if (reward.Percent)
-            DrawQuad(x + CARD_WIDTH * 0.5f - 40.0f, CARD_TOP + 200.0f, 80.0f, 6.0f, categoryColor);
+            DrawQuad(x + width * 0.5f - 40.0f, y + 200.0f, 80.0f, 6.0f, categoryColor);
 
-        // key to press for this card
-        DrawNumber(i + 1, x + CARD_WIDTH * 0.5f, CARD_TOP + CARD_HEIGHT - 80.0f, 40.0f, categoryColor);
+        // card number - matches the list printed to the debug output
+        DrawNumber(i + 1, x + width * 0.5f, y + height - 80.0f, 40.0f, categoryColor);
     }
 }

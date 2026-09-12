@@ -14,6 +14,7 @@ class RoguelikeUI : public GameObject
 private:
     class RoguelikeSystem* m_System = nullptr;
 
+    int m_HoveredIndex = -1; // card under the cursor, -1 when none
     ID3D11Buffer* m_VertexBuffer = nullptr;
     ID3D11InputLayout* m_VertexLayout = nullptr;
     ID3D11VertexShader* m_VertexShader = nullptr;
@@ -23,11 +24,17 @@ private:
     void DrawQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color);
     void DrawNumber(int Value, float CenterX, float Y, float DigitSize, const XMFLOAT4& Color);
 
+    // One place that decides where a card sits - both the drawing and the
+    // mouse hit test read it, so they can never disagree.
+    void GetCardRect(int Index, int Count, float& X, float& Y, float& Width, float& Height) const;
+
 public:
     void Init() override;
     void Uninit() override;
     void Draw() override;
 
     void SetSystem(class RoguelikeSystem* System);
+    int GetCardIndexAt(float X, float Y) const;
+    void SetHoveredIndex(int Index) { m_HoveredIndex = Index; }
 };
 
