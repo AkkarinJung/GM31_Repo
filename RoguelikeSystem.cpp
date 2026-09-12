@@ -29,6 +29,7 @@ static const RoguelikeReward s_RewardPool[] =
 
 static const int s_RewardPoolSize = (int)(sizeof(s_RewardPool) / sizeof(s_RewardPool[0]));
 
+std::vector<RoguelikeReward> RoguelikeSystem::s_Taken;
 
 void RoguelikeSystem::Start(Player* Owner, int ChoiceCount)
 {
@@ -38,7 +39,10 @@ void RoguelikeSystem::Start(Player* Owner, int ChoiceCount)
         return;
 
     m_Player = Owner;
-
+    // The player was rebuilt with this stage, so put back everything the
+    // run has already earned before offering anything new.
+    for (int i = 0; i < (int)s_Taken.size(); i++)
+        ApplyReward(s_Taken[i]);
     GenerateChoices(ChoiceCount);
 
     if (m_Choices.empty())
@@ -107,6 +111,7 @@ void RoguelikeSystem::SelectReward(int Index)
         return;
 
     ApplyReward(m_Choices[Index]);
+    s_Taken.push_back(m_Choices[Index]); // kept so the next stage can re-apply it
 
     m_State = State::Done;
     m_Choices.clear();

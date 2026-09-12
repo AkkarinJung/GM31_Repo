@@ -23,6 +23,7 @@ void Title::Update()
 {
 	if (Input::GetKeyTrigger(VK_RETURN))
 	{
+		Game::ResetProgress();
 		Manager::ChangeScene<Game>(3.0f);
 	}
 }

@@ -26,6 +26,11 @@ private:
     class Player* m_Player = nullptr;
     std::vector<RoguelikeReward> m_Choices;
     class RoguelikeUI* m_UI = nullptr;
+    // Everything taken so far this run. Each stage rebuilds the scene, so
+    // the Player is a brand new object with base stats - these are applied
+    // again before the new pick, which is what makes rewards stack across
+    // stages instead of quietly resetting.
+    static std::vector<RoguelikeReward> s_Taken;
 
     void ApplyCommon(const RoguelikeReward& Reward);
     void ApplyWeapon(const RoguelikeReward& Reward);
@@ -45,4 +50,8 @@ public:
 
     bool IsSelecting() const { return m_State == State::Selecting; }
     const std::vector<RoguelikeReward>& GetChoices() const { return m_Choices; }
+    // Clear the run's rewards. Call when a new run starts (Game::ResetProgress
+    // does), never between stages.
+    static void ResetRun() { s_Taken.clear(); }
+    static int GetTakenCount() { return (int)s_Taken.size(); }
 };

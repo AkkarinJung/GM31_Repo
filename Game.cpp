@@ -27,11 +27,36 @@
 #include "MPBar.h"
 #include "ControlsUI.h"
 
+#include "StageUI.h"
+#include "Stage.h"
+
 #include "RoguelikeSystem.h"
+
+int Game::s_Stage = 0;
+
+// Stage data only names an enemy type - this turns that into the AI preset
+// the enemy is configured with, so the table stays free of engine types.
+static EnemyAIConfig ConfigForType(EnemyType Type)
+{
+	switch (Type)
+	{
+	case EnemyType::Patroller: return EnemyAIConfig::Patroller();
+	case EnemyType::Turret:    return EnemyAIConfig::Turret();
+	case EnemyType::Flyer:     return EnemyAIConfig::Flyer();
+	case EnemyType::Walker:
+	default:                   return EnemyAIConfig::Walker();
+	}
+}
+
+void Game::ResetProgress()
+{
+	s_Stage = 0;
+	RoguelikeSystem::ResetRun(); // a new run starts with no rewards carried over
+}
 
 void Game::Init()
 {
-
+	
 
 	Manager::AddGameObj<Camera>();
 	//Manager::AddGameObj<field>();
@@ -40,29 +65,27 @@ void Game::Init()
 
 	Player* player = Manager::AddGameObj<Player>();
 
-	/*Manager::AddGameObj<Enemy>()->SetPosition({ -2.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 0.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 2.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 2.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 3.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 4.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 6.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 7.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 8.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 9.0f,0.0f,1.0f });
-	Manager::AddGameObj<Enemy>()->SetPosition({ 5.0f,-1.0f,1.0f });*/
-	Enemy* enemy = Manager::AddGameObj<Enemy>();
-	enemy->SetPosition({ 5.0f, 0.0f, 0.0f });
-	enemy->GetAI()->Configure(EnemyAIConfig::Walker());
+	// Everything that makes this stage different from the next comes out of
+	// the stage table - see Stage.cpp.
+	const StageData& stage = GetStageData(s_Stage);
 
-	Enemy* enemy2 = Manager::AddGameObj<Enemy>();
-	enemy2->SetPosition({ 7.0f, 0.0f, 0.0f });
-	enemy2->GetAI()->Configure(EnemyAIConfig::Walker());
+	for (int i = 0; i < stage.EnemyCount; i++)
+	{
+		const EnemySpawn& spawn = stage.Enemies[i];
 
-	Box* box = Manager::AddGameObj<Box>();
-	box->SetPosition({ 5.0f, 0.0f, 5.0f });
-	box->SetScale({ 2.0f, 1.0f, 2.0f });
+		Enemy* enemy = Manager::AddGameObj<Enemy>();
+		enemy->SetPosition(spawn.Position);
+		enemy->GetAI()->Configure(ConfigForType(spawn.Type));
+	}
+
+	for (int i = 0; i < stage.BoxCount; i++)
+	{
+		const BoxSpawn& spawn = stage.Boxes[i];
+
+		Box* box = Manager::AddGameObj<Box>();
+		box->SetPosition(spawn.Position);
+		box->SetScale(spawn.Scale);
+	}
 
 	//Manager::AddGameObj<Grass>()->SetPosition({ 10.0f,0.0f,-5.0f });
 
@@ -99,6 +122,7 @@ void Game::Init()
 	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
 	Manager::AddGameObj<MPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
 	Manager::AddGameObj<ControlsUI>();
+	Manager::AddGameObj<StageUI>();
 
 	// The map is built - hand over to the reward pick before gameplay runs.
 	// Scene::Init runs exactly once per map (Manager rebuilds the scene on
@@ -127,9 +151,23 @@ void Game::Update()
 
 	auto enemies = Manager::GetGameObjs<Enemy>();
 
-	if (enemies.size() == 0)
+	if (enemies.size() == 0 && !m_Cleared)
 	{
-		Manager::ChangeScene<Result>(3.0f);
+		m_Cleared = true;
+
+		if (s_Stage + 1 < GetStageCount())
+		{
+			// Next stage: the scene is rebuilt, so the map, the enemies and
+			// the reward pick are all fresh. Rewards taken so far are
+			// re-applied by RoguelikeSystem::Start.
+			s_Stage++;
+			Manager::ChangeScene<Game>(3.0f);
+		}
+		else
+		{
+			// Last stage cleared - the run is over.
+			Manager::ChangeScene<Result>(3.0f);
+		}
 	}
 }
 

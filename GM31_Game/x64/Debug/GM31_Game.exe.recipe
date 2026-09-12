@@ -19,6 +19,12 @@
       <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\litTextureVS.cso</FullPath>
     </ContentFile>
     <ContentFile>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\toonPS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\toonVS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\pro19\Desktop\GM31_Repo\unlitTexturePS.cso</FullPath>
     </ContentFile>
     <ContentFile>

@@ -53,6 +53,8 @@
     <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
     <ClCompile Include="SkyDome.cpp" />
+    <ClCompile Include="Stage.cpp" />
+    <ClCompile Include="StageUI.cpp" />
     <ClCompile Include="Sword.cpp" />
     <ClCompile Include="Title.cpp" />
     <ClCompile Include="Tree.cpp" />
@@ -98,6 +100,8 @@
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="SkyDome.h" />
+    <ClInclude Include="Stage.h" />
+    <ClInclude Include="StageUI.h" />
     <ClInclude Include="Stats.h" />
     <ClInclude Include="Sword.h" />
     <ClInclude Include="Title.h" />
