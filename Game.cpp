@@ -25,6 +25,7 @@
 
 #include "HPBar.h"
 #include "MPBar.h"
+#include "ControlsUI.h"
 
 #include "RoguelikeSystem.h"
 
@@ -97,6 +98,7 @@ void Game::Init()
 	Manager::AddGameObj<Score>()->SetPosition({ 100.0f,100.0f,0.0f });
 	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
 	Manager::AddGameObj<MPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
+	Manager::AddGameObj<ControlsUI>();
 
 	// The map is built - hand over to the reward pick before gameplay runs.
 	// Scene::Init runs exactly once per map (Manager rebuilds the scene on
