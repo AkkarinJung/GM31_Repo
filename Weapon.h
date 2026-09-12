@@ -33,7 +33,9 @@ public:
     void Update() override;
     void Draw() override;
 
-    virtual void Use(GameObject* Owner) {}; // fire / swing, override per weapon
+    // Fire / swing. Returns true when it actually hit something, which is
+    // what the owner needs to know to add hitstop, shake and so on.
+    virtual bool Use(GameObject* Owner) { return false; };
 
     float GetDamage() const { return m_Damage; }
     void SetDamage(float Damage) { m_Damage = Damage; }

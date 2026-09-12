@@ -30,6 +30,7 @@
     <ClCompile Include="DamageNumber.cpp" />
     <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="EnemyAI.cpp" />
+    <ClCompile Include="EnemyHPBar.cpp" />
     <ClCompile Include="Explosion.cpp" />
     <ClCompile Include="field.cpp" />
     <ClCompile Include="Font.cpp" />
@@ -74,6 +75,7 @@
     <ClInclude Include="DirectXTex\DirectXTex.h" />
     <ClInclude Include="Enemy.h" />
     <ClInclude Include="EnemyAI.h" />
+    <ClInclude Include="EnemyHPBar.h" />
     <ClInclude Include="Explosion.h" />
     <ClInclude Include="field.h" />
     <ClInclude Include="Font.h" />

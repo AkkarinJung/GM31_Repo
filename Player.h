@@ -54,6 +54,28 @@ private:
     const float m_ComboWindow = 0.6f; // seconds allowed between attacks to keep the combo going
 
     bool m_AttackQueued = false;
+    float m_AttackBufferTimer = 0.0f; // a press is remembered this long, then dropped
+
+    // Where in the swing the blade is actually dangerous, as a fraction of
+    // the animation. Damage used to land the instant the button went down,
+    // with the sword still behind the player - this is what made the hits
+    // feel disconnected from the animation.
+    const float m_AttackHitPoint = 0.35f;
+    bool m_AttackHitDone = false;
+
+    // How far into a swing the next one may start. Waiting for the full
+    // animation (recovery included) is what made combos feel sluggish.
+    const float m_ComboCancelPoint = 0.6f;
+    const float m_AttackBufferTime = 0.35f;
+
+    // A short freeze on impact, then the camera kick - the two cheapest
+    // things that make a hit read as a hit.
+    int m_HitStopFrames = 0;
+    const int m_HitStopOnHit = 5;
+    const float m_HitShake = 0.06f;
+
+    // A small step into the swing, so an attack has weight behind it.
+    const float m_AttackLunge = 3.0f;
 
     //Right attack
     int m_RightAttackMPCost = 15;

@@ -18,13 +18,15 @@ void Sword::LoadModel()
     m_AnimationModel->Load("asset\\model\\sword.fbx"); // TODO: point at a real sword fbx
 
     m_Damage = 3.0f;
-    m_Cooldown = 0.5f;
+    m_Cooldown = 0.15f; // just a safety rail - the swing animation paces the
+                        // combo now. A cooldown longer than the animation let
+                        // a swing play with no damage behind it.
 }
 
-void Sword::Use(GameObject* Owner)
+bool Sword::Use(GameObject* Owner)
 {
     if (!CanUse())
-        return;
+        return false;
 
     m_CooldownTimer = m_Cooldown;
 
@@ -49,6 +51,8 @@ void Sword::Use(GameObject* Owner)
     if (attackPower < 1)
         attackPower = 1;
 
+    bool hit = false;
+
     auto enemies = Manager::GetGameObjs<Enemy>();
     for (auto enemy : enemies)
     {
@@ -68,6 +72,9 @@ void Sword::Use(GameObject* Owner)
             continue;
 
         enemy->AddDamage(attackPower);
-        enemy->Shake(forward * 0.3f);
+        enemy->Shake(forward * 0.5f);
+        hit = true;
     }
+
+    return hit;
 }

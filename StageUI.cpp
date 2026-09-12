@@ -123,13 +123,12 @@ void StageUI::DrawBanner(float X, float Y, float Width, float Height, const XMFL
 void StageUI::Draw()
 {
     int stage = Game::GetStageIndex();
-    bool lastStage = stage + 1 >= GetStageCount();
 
     // No enemies left means Game is already changing scene - say so while
     // that plays out.
     if (Manager::GetGameObjs<Enemy>().size() == 0)
     {
-        Font::DrawCentered(lastStage ? "ALL STAGES CLEAR" : "STAGE CLEAR",
+        Font::DrawCentered(Game::IsRunComplete() ? "ALL STAGES CLEAR" : "STAGE CLEAR",
             SCREEN_WIDTH * 0.5f, SCREEN_HEIGHT * 0.5f - 40.0f, 52.0f,
             XMFLOAT4(1.0f, 0.95f, 0.6f, 1.0f));
         return;

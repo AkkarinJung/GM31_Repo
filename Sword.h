@@ -13,5 +13,5 @@ protected:
     void LoadModel() override;
 
 public:
-    void Use(GameObject* Owner) override;
+    bool Use(GameObject* Owner) override;
 };

@@ -21,6 +21,7 @@ static const InputSprite KEY_A     = { 18, 3, 1 };
 static const InputSprite KEY_D     = { 20, 3, 1 };
 static const InputSprite KEY_SPACE = { 31, 6, 3 };
 static const InputSprite KEY_ESC   = { 17, 0, 1 };
+static const InputSprite KEY_TAB   = { 19, 5, 2 }; // 2 tiles wide
 static const InputSprite KEY_F1    = { 18, 0, 1 };
 static const InputSprite MOUSE_LEFT  = {  9, 2, 1 };
 static const InputSprite MOUSE_RIGHT = { 10, 2, 1 };
@@ -40,6 +41,7 @@ static const ControlEntry s_Controls[] =
     { KEY_SPACE,   KEY_NONE,  "Jump" },
     { MOUSE_LEFT,  KEY_NONE,  "Attack" },
     { MOUSE_RIGHT, KEY_NONE,  "Special attack" },
+    { KEY_F1,      KEY_NONE,  "Debug camera" },
     { KEY_ESC,     KEY_NONE,  "Quit" },
 };
 
@@ -110,7 +112,9 @@ void ControlsUI::Uninit()
 
 void ControlsUI::Update()
 {
-    if (Input::GetKeyTrigger(VK_F1))
+    // Not F1: Camera::Update uses that for its debug free-fly camera, so
+    // one press would open this panel and unhook the camera at once.
+    if (Input::GetKeyTrigger(VK_TAB))
         m_Open = !m_Open;
 
     GameObject::Update();
@@ -253,8 +257,8 @@ void ControlsUI::Draw()
         float hintX = 24.0f;
         float hintY = SCREEN_HEIGHT - 48.0f;
 
-        DrawPrompt(KEY_F1, hintX, hintY, 28.0f);
-        Font::Draw("CONTROLS", hintX + 38.0f, hintY + 4.0f, 20.0f,
+        DrawPrompt(KEY_TAB, hintX, hintY, 28.0f);
+        Font::Draw("CONTROLS", hintX + 66.0f, hintY + 4.0f, 20.0f,
             XMFLOAT4(1.0f, 1.0f, 1.0f, 0.75f));
         return;
     }
@@ -295,7 +299,7 @@ void ControlsUI::Draw()
         rowY += ROW_HEIGHT;
     }
 
-    DrawPrompt(KEY_F1, panelX + 40.0f, panelY + panelHeight - 42.0f, 26.0f);
-    Font::Draw("CLOSE", panelX + 76.0f, panelY + panelHeight - 38.0f, 20.0f,
+    DrawPrompt(KEY_TAB, panelX + 40.0f, panelY + panelHeight - 42.0f, 26.0f);
+    Font::Draw("CLOSE", panelX + 100.0f, panelY + panelHeight - 38.0f, 20.0f,
         XMFLOAT4(0.65f, 0.68f, 0.75f, 1.0f));
 }

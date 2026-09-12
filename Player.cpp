@@ -279,26 +279,61 @@ void Player::Update()
     //    m_Scale.z = 2.0f;
     //}
 
+    // Every press is buffered and spends itself as soon as the swing allows
+    // it, instead of being dropped for arriving a few frames early.
     if (Input::GetKeyTrigger(VK_LBUTTON))
     {
-        if (m_Attacking)
-            m_AttackQueued = true;   // current swing is still playing - buffer this press
-        else
-            StartAttack();
+        m_AttackQueued = true;
+        m_AttackBufferTimer = m_AttackBufferTime;
     }
 
-    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_Attacking)
+    if (m_AttackQueued)
+    {
+        m_AttackBufferTimer -= dt;
+        if (m_AttackBufferTimer <= 0.0f)
+            m_AttackQueued = false; // stale press, let it go
+    }
+
+    // The swing lands here, partway through the animation, not when the
+    // button went down.
+    if (m_Attacking && !m_AttackHitDone && m_AttackAnimLength > 0 &&
+        m_NextAnimationFrame >= (int)(m_AttackAnimLength * m_AttackHitPoint))
+    {
+        m_AttackHitDone = true;
+
+        if (m_Weapon->Use(this))
+        {
+            // Connected: hold the frame for a moment and kick the camera.
+            m_HitStopFrames = m_HitStopOnHit;
+
+            Camera* camera = Manager::GetGameObj<Camera>();
+            if (camera != nullptr)
+                camera->Shake(GetFoward() * m_HitShake);
+        }
+    }
+
+    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_Attacking && m_Weapon->CanUse())
     {
         StartRightAttack();
     }
 
-    // Attacks take priority and run to completion; once done (or if not
-    // attacking), fall back to Jump (while airborne) or Run/Idle.
     if (m_Attacking && m_NextAnimationFrame >= m_AttackAnimLength)
     {
         m_Attacking = false;
+    }
 
-        if (m_AttackQueued)
+    // Start the next swing: either the player is idle, or the current swing
+    // has gone past its cancel point - a queued press never has to wait for
+    // the recovery frames to play out. CanUse() keeps a swing from starting
+    // at all when the weapon could not damage anything, so there are no
+    // empty swings.
+    if (m_AttackQueued && m_Weapon->CanUse())
+    {
+        bool canStart = !m_Attacking ||
+            (m_AttackHitDone &&
+                m_NextAnimationFrame >= (int)(m_AttackAnimLength * m_ComboCancelPoint));
+
+        if (canStart)
         {
             m_AttackQueued = false;
             StartAttack();
@@ -341,7 +376,14 @@ void Player::Update()
         }
     }
 
-    if (!m_FreezeAnimation)
+    if (m_HitStopFrames > 0)
+    {
+        // Impact freeze - the animation holds on the contact pose for a few
+        // frames. Nothing else about the player is paused, so it reads as
+        // weight rather than as a stutter.
+        m_HitStopFrames--;
+    }
+    else if (!m_FreezeAnimation)
     {
         m_AnimationFrame++;
         m_NextAnimationFrame++;
@@ -419,7 +461,15 @@ void Player::DebugDumpSwing(const char* AnimationName, const char* BoneName)
 
 void Player::StartAttack()
 {
-    m_Weapon->Use(this);
+    // No damage here any more - the swing lands on its active frame, see
+    // the hit window in Update(). Use() at this point hit the enemy while
+    // the sword was still behind the player's back.
+    m_AttackHitDone = false;
+
+    // A step into the swing. Movement is locked while attacking, so the
+    // usual drag bleeds this off on its own.
+    Vector3 forward = GetFoward();
+    m_Velocity.x += forward.x * m_AttackLunge;
 
     m_AttackCombo = (m_ComboResetTimer > m_ComboWindow)
         ? 0
@@ -446,7 +496,10 @@ void Player::StartRightAttack()
     if (!m_Stats->TrySpendMP(m_RightAttackMPCost))
         return; // not enough MP - attack doesn't trigger
 
-    m_Weapon->Use(this);
+    m_AttackHitDone = false;
+
+    Vector3 forward = GetFoward();
+    m_Velocity.x += forward.x * m_AttackLunge;
 
     m_Attacking = true;
 

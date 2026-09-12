@@ -28,11 +28,13 @@
 #include "ControlsUI.h"
 
 #include "StageUI.h"
+#include "EnemyHPBar.h"
 #include "Stage.h"
 
 #include "RoguelikeSystem.h"
 
 int Game::s_Stage = 0;
+bool Game::s_RunComplete = false;
 
 // Stage data only names an enemy type - this turns that into the AI preset
 // the enemy is configured with, so the table stays free of engine types.
@@ -51,6 +53,7 @@ static EnemyAIConfig ConfigForType(EnemyType Type)
 void Game::ResetProgress()
 {
 	s_Stage = 0;
+	s_RunComplete = false;
 	RoguelikeSystem::ResetRun(); // a new run starts with no rewards carried over
 }
 
@@ -123,6 +126,7 @@ void Game::Init()
 	Manager::AddGameObj<MPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
 	Manager::AddGameObj<ControlsUI>();
 	Manager::AddGameObj<StageUI>();
+	Manager::AddGameObj<EnemyHPBar>();
 
 	// The map is built - hand over to the reward pick before gameplay runs.
 	// Scene::Init runs exactly once per map (Manager rebuilds the scene on
@@ -166,6 +170,7 @@ void Game::Update()
 		else
 		{
 			// Last stage cleared - the run is over.
+			s_RunComplete = true;
 			Manager::ChangeScene<Result>(3.0f);
 		}
 	}
