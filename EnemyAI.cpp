@@ -39,6 +39,7 @@ EnemyAIConfig EnemyAIConfig::Walker()
     config.CanAttack = true;
     config.AttackRange = 1.7f;
     config.AttackCooldown = 1.2f;
+    config.AttackDuration = 0.9f; // long enough for the telegraph to be read and answered
     config.FaceTarget = true;
     config.SeparationRadius = 1.4f;
     config.SeparationStrength = 1.0f;
@@ -51,6 +52,7 @@ EnemyAIConfig EnemyAIConfig::Turret()
     config.CanAttack = true;
     config.AttackRange = 2.0f;
     config.AttackCooldown = 1.5f;
+    config.AttackDuration = 0.9f;
     config.DetectRange = 2.0f;
     config.LoseRange = 3.0f;
     return config;
@@ -67,6 +69,7 @@ EnemyAIConfig EnemyAIConfig::Flyer()
     config.CanAttack = true;
     config.AttackRange = 1.6f;
     config.AttackCooldown = 1.5f;
+    config.AttackDuration = 0.8f;
     config.Flying = true;
     config.HoverHeight = 2.5f;
     config.BobAmplitude = 0.3f;
@@ -389,10 +392,15 @@ bool EnemyAI::ConsumeAttack()
 
 void EnemyAI::OnDamaged()
 {
+    Stun(m_Config.StunTime);
+}
+
+void EnemyAI::Stun(float Time)
+{
     if (m_State == EnemyState::Dead)
         return;
 
-    m_StunTimer = m_Config.StunTime;
+    m_StunTimer = Time;
     SetState(EnemyState::Stunned);
 
     m_MoveDirection = { 0.0f, 0.0f, 0.0f };

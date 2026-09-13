@@ -137,8 +137,13 @@ public:
     bool IsFlying() const { return m_Config.Flying; }
     bool ConsumeAttack(); // true once per swing, cleared when read
 
+    // What the owner needs to time its own swing against.
+    float GetAttackRange() const { return m_Config.AttackRange; }
+    float GetAttackDuration() const { return m_Config.AttackDuration; }
+
     // Events the owner reports back in.
     void OnDamaged();
+    void Stun(float Time); // longer than a hit stun when the swing is parried
     void OnDeath();
 
     GameObject* GetOwner() const { return m_GameObject; }

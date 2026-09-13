@@ -11,6 +11,15 @@ private:
     class EnemyAI* m_AI = nullptr;
     int m_AttackDamage = 20;
 
+    // The swing is announced before it lands. AttackTarget used to fire on
+    // the same frame the AI asked for it, so there was nothing to read and
+    // nothing to react to - this window is what the player parries.
+    bool m_AttackPending = false;
+    float m_AttackWindup = 0.0f;     // counts down to the strike
+    float m_AttackWindupTime = 0.0f; // what it started at, for the flash ramp
+    const float m_AttackWindupRatio = 0.7f; // of the AI's attack duration
+    const float m_ParryStunTime = 1.2f;     // a parried enemy is left wide open
+
     void AttackTarget();
 
     // Sine Wave

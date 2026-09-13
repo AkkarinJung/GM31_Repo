@@ -158,7 +158,10 @@ void Player::Update()
     // facing every frame snapped the player (and the sword parented to it)
     // round to face +Z the moment the velocity died out, and flipped it
     // 180 degrees on the frame the velocity crossed zero.
-    if (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f)
+    // Not while attacking either: the lunge and the recoil are velocity too,
+    // and reading the facing off them spun the player away from the enemy
+    // mid-swing.
+    if (!m_Attacking && (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f))
         m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
 
     // oldGround, not m_Ground: m_Ground was cleared at the top of Update and
@@ -218,6 +221,33 @@ void Player::Update()
         }
     }
 
+    // Enemies nudge the player apart first; the crates below then get the
+    // final say. Resolving crates first let an enemy shove the player inside
+    // one, and the next frame's push-back reverted to a position that was
+    // already inside it - so the player stuck in the wall.
+    auto enemies = Manager::GetGameObjs<Enemy>();
+
+    for (auto enemy : enemies)
+    {
+        const float playerRadius = 0.7f;
+        const float enemyRadius = 0.7f;
+
+        Vector3 dir = m_Position - enemy->GetPosition();
+        float length = dir.lenght();
+
+        if (Collision::SphereVsSphere(m_Position, playerRadius, enemy->GetPosition(), enemyRadius))
+        {
+            if (length > 0.0f)
+            {
+                float overlap = (playerRadius + enemyRadius) - length;
+                dir /= length;
+                m_Position += dir * overlap;
+            }
+
+            break;
+        }
+    }
+
     auto boxes = Manager::GetGameObjs<Box>();
     for (auto box : boxes)
     {
@@ -249,28 +279,6 @@ void Player::Update()
         }
     }
 
-    auto enemies = Manager::GetGameObjs<Enemy>();
-
-    for (auto enemy : enemies)
-    {
-        const float playerRadius = 0.7f;
-        const float enemyRadius = 0.7f;
-
-        Vector3 dir = m_Position - enemy->GetPosition();
-        float length = dir.lenght();
-
-        if (Collision::SphereVsSphere(m_Position, playerRadius, enemy->GetPosition(), enemyRadius))
-        {
-            if (length > 0.0f)
-            {
-                float overlap = (playerRadius + enemyRadius) - length;
-                dir /= length;
-                m_Position += dir * overlap;
-            }
-
-            break;
-        }
-    }
 
     //if (!oldGround && m_Ground)
     //{
@@ -278,6 +286,28 @@ void Player::Update()
     //    m_Scale.x = 2.0f;
     //    m_Scale.z = 2.0f;
     //}
+
+    if (m_ParryTimer > 0.0f)
+        m_ParryTimer -= dt;
+
+    // MP trickles back. The special costs 15 and a parry only refunds 10, so
+    // without this the bar empties and right click quietly does nothing.
+    if (m_Stats != nullptr && m_Stats->GetMP() < m_Stats->GetMaxMP())
+    {
+        m_MPRegenCarry += m_MPRegenPerSecond * dt;
+
+        int whole = (int)m_MPRegenCarry;
+        if (whole > 0)
+        {
+            m_Stats->RestoreMP(whole);
+            m_MPRegenCarry -= (float)whole;
+        }
+    }
+
+    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_Attacking && m_Weapon->CanUse())
+    {
+        StartRightAttack();
+    }
 
     // Every press is buffered and spends itself as soon as the swing allows
     // it, instead of being dropped for arriving a few frames early.
@@ -312,14 +342,10 @@ void Player::Update()
         }
     }
 
-    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_Attacking && m_Weapon->CanUse())
-    {
-        StartRightAttack();
-    }
-
     if (m_Attacking && m_NextAnimationFrame >= m_AttackAnimLength)
     {
         m_Attacking = false;
+        m_SpecialAttacking = false;
     }
 
     // Start the next swing: either the player is idle, or the current swing
@@ -459,12 +485,44 @@ void Player::DebugDumpSwing(const char* AnimationName, const char* BoneName)
     }
 }
 
+bool Player::IsParrying() const
+{
+    return m_ParryTimer > 0.0f;
+}
+
+bool Player::TryParry(GameObject* Attacker)
+{
+    if (!IsParrying())
+        return false;
+
+    // Turn on the attacker. The swing is already playing, and finishing it
+    // pointed away from whoever was parried looked like a miss.
+    if (Attacker != nullptr)
+    {
+        float dx = Attacker->GetPosition().x - m_Position.x;
+        if (fabsf(dx) > 0.01f)
+            m_Rotation.y = atan2f(dx, 0.0f);
+    }
+
+    m_HitStopFrames = m_ParryHitStop;
+
+    Camera* camera = Manager::GetGameObj<Camera>();
+    if (camera != nullptr)
+        camera->Shake(GetFoward() * m_ParryShake);
+
+    if (m_Stats != nullptr)
+        m_Stats->RestoreMP(m_ParryMPReward);
+
+    return true;
+}
+
 void Player::StartAttack()
 {
     // No damage here any more - the swing lands on its active frame, see
     // the hit window in Update(). Use() at this point hit the enemy while
     // the sword was still behind the player's back.
     m_AttackHitDone = false;
+    m_SpecialAttacking = false;
 
     // A step into the swing. Movement is locked while attacking, so the
     // usual drag bleeds this off on its own.
@@ -491,12 +549,20 @@ void Player::StartAttack()
     // regardless of what animation played before it.
 }
 
+// Right click. Costs MP, and its opening frames parry - see IsParrying().
 void Player::StartRightAttack()
 {
     if (!m_Stats->TrySpendMP(m_RightAttackMPCost))
         return; // not enough MP - attack doesn't trigger
 
+    StartCounterAttack();
+}
+
+void Player::StartCounterAttack()
+{
     m_AttackHitDone = false;
+    m_SpecialAttacking = true;
+    m_ParryTimer = m_ParryTime; // the deflect is live from the first frame
 
     Vector3 forward = GetFoward();
     m_Velocity.x += forward.x * m_AttackLunge;

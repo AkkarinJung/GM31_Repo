@@ -11,6 +11,8 @@
 #include "MeshField.h"
 #include "Stats.h"
 #include "DamageNumber.h"
+#include "Player.h"
+#include "Box.h"
 #include <algorithm>
 #define NOMINMAX
 #include <cmath>
@@ -69,17 +71,12 @@ void Enemy::Update()
     m_Position += m_Shake * cosf(m_ShakeTime * 100.0f);
     m_ShakeTime += dt;
     m_Shake *= 0.9;
-    // white flash when hurt, red flash for the whole attack swing
-    bool attacking = (m_AI->GetState() == EnemyState::Attack);
-    m_ModelRenderer->SetFlashColor(m_Flash
-        ? XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f)
-        : XMFLOAT4(1.0f, 0.15f, 0.15f, 0.9f));
-    m_ModelRenderer->SetFlash(m_Flash || attacking);
-
     if (m_ShakeTime > 0.04f)
     {
         m_Flash = false;
     }
+
+    Vector3 oldPosition = m_Position;
 
     // -----------------------------
     // Act on the AI's decisions - the AI only decides, moving is done here
@@ -102,8 +99,77 @@ void Enemy::Update()
 
     m_Position.z = 0.0f; // the player is locked to this plane, so enemies are too
 
+    // Crates are solid for walking enemies too - they used to stroll
+    // straight through. Fliers pass over them.
+    if (!m_AI->IsFlying())
+    {
+        auto boxes = Manager::GetGameObjs<Box>();
+        for (auto box : boxes)
+        {
+            Vector3 boxPosition = box->GetPosition();
+            Vector3 boxScale = box->GetScale();
+
+            if (boxPosition.x - boxScale.x < m_Position.x &&
+                m_Position.x < boxPosition.x + boxScale.x &&
+                boxPosition.z - boxScale.z < m_Position.z &&
+                m_Position.z < boxPosition.z + boxScale.z)
+            {
+                if (boxPosition.y + boxScale.y < m_Position.y &&
+                    m_Position.y < boxPosition.y + boxScale.y * 2.0f)
+                {
+                    // standing on the crate
+                    m_Position.y = boxPosition.y + boxScale.y * 2.0f;
+                }
+                else if (boxPosition.y - boxScale.y < m_Position.y &&
+                    m_Position.y < boxPosition.y + boxScale.y)
+                {
+                    // walked into the side - stay where it was
+                    m_Position.x = oldPosition.x;
+                }
+            }
+        }
+    }
+
+    // The AI asking for an attack starts the telegraph; the hit lands when
+    // the telegraph runs out.
     if (m_AI->ConsumeAttack())
-        AttackTarget();
+    {
+        m_AttackWindupTime = m_AI->GetAttackDuration() * m_AttackWindupRatio;
+        m_AttackWindup = m_AttackWindupTime;
+        m_AttackPending = true;
+    }
+
+    if (m_AttackPending)
+    {
+        m_AttackWindup -= dt;
+
+        if (m_AttackWindup <= 0.0f)
+        {
+            m_AttackPending = false;
+            AttackTarget();
+        }
+    }
+
+    // White flash when hurt. While winding up, the enemy pulses red and the
+    // pulse brightens as the strike closes in - that is the tell.
+    if (m_Flash)
+    {
+        m_ModelRenderer->SetFlashColor(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+        m_ModelRenderer->SetFlash(true);
+    }
+    else if (m_AttackPending && m_AttackWindupTime > 0.0f)
+    {
+        float t = 1.0f - (m_AttackWindup / m_AttackWindupTime); // 0 at the start, 1 at the strike
+        float pulse = fabsf(sinf(t * XM_PI * 3.0f));
+        float alpha = 0.25f + 0.75f * (t * 0.6f + pulse * 0.4f);
+
+        m_ModelRenderer->SetFlashColor(XMFLOAT4(1.0f, 0.15f, 0.15f, alpha));
+        m_ModelRenderer->SetFlash(true);
+    }
+    else
+    {
+        m_ModelRenderer->SetFlash(false);
+    }
 
     m_Time += dt;
 
@@ -194,6 +260,25 @@ void Enemy::AttackTarget()
     GameObject* target = m_AI->GetTarget();
     if (target == nullptr)
         return;
+
+    // The telegraph is a real window: leaving the enemy's reach during it
+    // makes the swing whiff.
+    Vector3 toTarget = target->GetPosition() - m_Position;
+    toTarget.y = 0.0f;
+
+    if (toTarget.lenght() > m_AI->GetAttackRange() + 0.4f)
+        return;
+
+    // Parried: no damage, and the enemy is left open for far longer than a
+    // normal hit stun.
+    Player* player = dynamic_cast<Player*>(target);
+    if (player != nullptr && player->TryParry(this))
+    {
+        m_AI->Stun(m_ParryStunTime);
+        m_Flash = true;
+        m_ShakeTime = 0.0f;
+        return;
+    }
 
     Stats* stats = target->GetGameComponent<Stats>();
     if (stats != nullptr)

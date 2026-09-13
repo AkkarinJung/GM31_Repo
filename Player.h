@@ -80,8 +80,29 @@ private:
     //Right attack
     int m_RightAttackMPCost = 15;
 
+    // The special attack parries. Its opening frames deflect an incoming
+    // enemy attack instead of taking it, so the move is a read on the
+    // enemy's telegraph rather than a damage button - and the MP cost is
+    // what stops it from being mashed.
+    bool m_SpecialAttacking = false;
+
+    // Seconds, deliberately not a fraction of the animation: tying it to the
+    // swing made the window depend on however long AttackRight happens to
+    // be, and it vanished entirely if that animation failed to load.
+    float m_ParryTimer = 0.0f;
+    const float m_ParryTime = 0.35f;
+    const int m_ParryMPReward = 10;   // part of the cost back for reading it right
+    const float m_MPRegenPerSecond = 4.0f; // without this the parry runs dry and stops working
+    float m_MPRegenCarry = 0.0f;
+    const int m_ParryHitStop = 10;    // a heavier freeze than a normal hit
+    const float m_ParryShake = 0.12f;
+
     void StartAttack();
     void StartRightAttack();
+
+    // The AttackRight swing on its own. StartRightAttack pays MP for it; a
+    // parry gets it free, because the parry already paid.
+    void StartCounterAttack();
 
 public:
     void Init() override;
@@ -98,6 +119,12 @@ public:
     void SetJumpPower(float JumpPower) { m_JumpPower = JumpPower; }
 
     class Weapon* GetWeapon() const;
+
+    // Called by an enemy whose swing is about to land. Returns true when the
+    // special attack's parry frames were up, in which case the attack is
+    // spent and the attacker should consider itself countered.
+    bool TryParry(GameObject* Attacker);
+    bool IsParrying() const;
 
     void DebugDumpSwing(const char* AnimationName, const char* BoneName);
 };

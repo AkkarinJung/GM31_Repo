@@ -22,6 +22,7 @@ static const InputSprite KEY_D     = { 20, 3, 1 };
 static const InputSprite KEY_SPACE = { 31, 6, 3 };
 static const InputSprite KEY_ESC   = { 17, 0, 1 };
 static const InputSprite KEY_TAB   = { 19, 5, 2 }; // 2 tiles wide
+static const InputSprite KEY_SHIFT = { 17, 7, 2 }; // 2 tiles wide
 static const InputSprite KEY_F1    = { 18, 0, 1 };
 static const InputSprite MOUSE_LEFT  = {  9, 2, 1 };
 static const InputSprite MOUSE_RIGHT = { 10, 2, 1 };
@@ -40,7 +41,7 @@ static const ControlEntry s_Controls[] =
     { KEY_A,       KEY_D,     "Move left / right" },
     { KEY_SPACE,   KEY_NONE,  "Jump" },
     { MOUSE_LEFT,  KEY_NONE,  "Attack" },
-    { MOUSE_RIGHT, KEY_NONE,  "Special attack" },
+    { MOUSE_RIGHT, KEY_NONE,  "Special  -15 MP  parries" },
     { KEY_F1,      KEY_NONE,  "Debug camera" },
     { KEY_ESC,     KEY_NONE,  "Quit" },
 };
