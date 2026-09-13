@@ -14,10 +14,19 @@ private:
 
     bool m_Ground = true;
     float m_MoveAnimation = 0.0f;
+
+    // Collision body: half width, half height, half depth, standing on
+    // m_Position. Everything solid is resolved against this one box.
+    Vector3 m_BodyHalfSize{ 0.4f, 0.9f, 0.4f };
     // Movement tuning. Fields rather than literals in Update() so the
     // start-of-map rewards can scale them (see RoguelikeSystem).
+    //
+    // The jump has to clear the tallest crate in the stage table. A crate's
+    // top is Scale.y * 2, so the tallest (1.25) stands at 2.5; power 25
+    // reaches 2.98, which leaves room for a sloppy jump. Power 20 only
+    // reached 1.877 and could not get onto any of them.
     float m_MoveSpeed = 50.0f;
-    float m_JumpPower = 20.0f;
+    float m_JumpPower = 25.0f;
     class Audio* m_JumpSE;
 
     GameObject* m_Child;
@@ -90,7 +99,10 @@ private:
     // swing made the window depend on however long AttackRight happens to
     // be, and it vanished entirely if that animation failed to load.
     float m_ParryTimer = 0.0f;
-    const float m_ParryTime = 0.35f;
+    // Long enough that a fast reaction still covers the strike. The enemy
+    // telegraph is ~0.63s, so a 0.35s window expired before the hit whenever
+    // the player answered the flash quickly - which is what everyone does.
+    const float m_ParryTime = 0.5f;
     const int m_ParryMPReward = 10;   // part of the cost back for reading it right
     const float m_MPRegenPerSecond = 4.0f; // without this the parry runs dry and stops working
     float m_MPRegenCarry = 0.0f;

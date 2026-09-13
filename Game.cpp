@@ -50,6 +50,20 @@ static EnemyAIConfig ConfigForType(EnemyType Type)
 	}
 }
 
+// How hard each type is to shove around. A turret is a fixed emplacement
+// and barely budges; a flier is light enough to knock aside.
+static float MassForType(EnemyType Type)
+{
+	switch (Type)
+	{
+	case EnemyType::Turret: return 5.0f;
+	case EnemyType::Flyer:  return 0.6f;
+	case EnemyType::Patroller:
+	case EnemyType::Walker:
+	default:                return 1.0f;
+	}
+}
+
 void Game::ResetProgress()
 {
 	s_Stage = 0;
@@ -79,6 +93,7 @@ void Game::Init()
 		Enemy* enemy = Manager::AddGameObj<Enemy>();
 		enemy->SetPosition(spawn.Position);
 		enemy->GetAI()->Configure(ConfigForType(spawn.Type));
+		enemy->SetMass(MassForType(spawn.Type));
 	}
 
 	for (int i = 0; i < stage.BoxCount; i++)

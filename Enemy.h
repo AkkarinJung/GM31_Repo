@@ -32,6 +32,19 @@ private:
     // Collision / physics
     Vector3 m_Velocity = Vector3(0.0f, 0.0f, 0.0f);
     float m_Radius = 1.0f;
+
+    // Collision body, standing on m_Position - the same box the player uses,
+    // resolved by the same code.
+    Vector3 m_BodyHalfSize{ 0.5f, 0.7f, 0.5f };
+
+    // How close this enemy may get to the player before it steps back. The
+    // player is never moved by this - only the enemy is.
+    const float m_PlayerSeparation = 1.1f;
+
+    // Push resistance. A separation step moves this enemy by 1 / m_Mass of
+    // the overlap, so a heavy enemy shrugs off a shove and takes a few
+    // frames to give ground instead of sliding away in one.
+    float m_PushGiveMin = 0.1f; // even the heaviest still yields eventually
     float m_Mass = 1.0f;
 
     // Shader
@@ -70,5 +83,13 @@ public:
 
     // Spawn-time configuration: Manager::AddGameObj<Enemy>()->GetAI()->Configure(...)
     class EnemyAI* GetAI() const { return m_AI; }
+
+    // Heavier enemies resist being shoved, by the player and by each other.
+    void SetMass(float Mass) { m_Mass = Mass; }
+    float GetMass() const { return m_Mass; }
+
+    // True while the swing is telegraphing. An enemy committed to an attack
+    // plants itself - it cannot be shoved out of its own swing.
+    bool IsWindingUp() const { return m_AttackPending; }
 
 };

@@ -101,7 +101,6 @@ void Player::Update()
         m_NextAnimationFrame++;
     }
 
-    Vector3 oldPosition = m_Position;
     float dt = 1.0 / 60.0f;
 
     if (Input::GetKeyTrigger(VK_F4))
@@ -189,7 +188,19 @@ void Player::Update()
     m_Velocity.x += -m_Velocity.x * 5.0f * dt;
     m_Velocity.z += -m_Velocity.z * 5.0f * dt;
 
-    m_Position += m_Velocity * dt;
+    // Solids first, one axis at a time. Resolving X and Y separately is what
+    // keeps a corner from producing two fighting pushes in the same frame.
+    std::vector<AABB> solids = Collision::GatherSolids();
+
+    if (Collision::MoveX(m_Position, m_BodyHalfSize, m_Velocity.x * dt, solids))
+        m_Velocity.x = 0.0f;
+
+    bool landed = false;
+    if (Collision::MoveY(m_Position, m_BodyHalfSize, m_Velocity.y * dt, solids, landed))
+        m_Velocity.y = 0.0f;
+
+    if (landed)
+        m_Ground = true;
 
     MeshField* meshField = Manager::GetGameObj<MeshField>();
     float height = meshField->GetHeight(m_Position);
@@ -224,60 +235,15 @@ void Player::Update()
     // Enemies nudge the player apart first; the crates below then get the
     // final say. Resolving crates first let an enemy shove the player inside
     // one, and the next frame's push-back reverted to a position that was
-    // already inside it - so the player stuck in the wall.
-    auto enemies = Manager::GetGameObjs<Enemy>();
+    // Enemies are deliberately not resolved here. Nothing but input, gravity
+    // and solid geometry is allowed to move the player: an enemy that walks
+    // into the player steps out of the player instead (see Enemy::Update).
+    // Pushing from this side meant two enemies either side each shoved the
+    // player at the other one every frame, which is what made it jitter.
 
-    for (auto enemy : enemies)
-    {
-        const float playerRadius = 0.7f;
-        const float enemyRadius = 0.7f;
-
-        Vector3 dir = m_Position - enemy->GetPosition();
-        float length = dir.lenght();
-
-        if (Collision::SphereVsSphere(m_Position, playerRadius, enemy->GetPosition(), enemyRadius))
-        {
-            if (length > 0.0f)
-            {
-                float overlap = (playerRadius + enemyRadius) - length;
-                dir /= length;
-                m_Position += dir * overlap;
-            }
-
-            break;
-        }
-    }
-
-    auto boxes = Manager::GetGameObjs<Box>();
-    for (auto box : boxes)
-    {
-        Vector3 boxPosition = box->GetPosition();
-        Vector3 boxScale = box->GetScale();
-
-        if (boxPosition.x - boxScale.x < m_Position.x &&
-            m_Position.x < boxPosition.x + boxScale.x &&
-            boxPosition.z - boxScale.z < m_Position.z &&
-            m_Position.z < boxPosition.z + boxScale.z)
-        {
-            if (boxPosition.y + boxScale.y < m_Position.y &&
-                m_Position.y < boxPosition.y + boxScale.y * 2.0f)
-            {
-                //ã–Ê‚ÉÕ“Ë top of the box
-                m_Position.y = boxPosition.y + boxScale.y * 2.0f;
-                m_Velocity.y = 0.0f;
-                m_Ground = true;
-            }
-            else if (boxPosition.y - boxScale.y < m_Position.y &&
-                m_Position.y < boxPosition.y + boxScale.y)
-            {
-                //‘¤–Ê‚ÉÕ“Ë
-                m_Position.x = oldPosition.x;
-                m_Position.z = oldPosition.z;
-                m_Velocity.x = 0.0f;
-                m_Velocity.z = 0.0f;
-            }
-        }
-    }
+    // Solids get the last word - the tree push above is soft and could have
+    // put the player inside a crate.
+    Collision::PushOutOfSolids(m_Position, m_BodyHalfSize, solids);
 
 
     //if (!oldGround && m_Ground)
@@ -304,7 +270,12 @@ void Player::Update()
         }
     }
 
-    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_Attacking && m_Weapon->CanUse())
+    // Cancels out of a normal swing. Requiring !m_Attacking silently ate the
+    // press whenever the player was mid-combo, which is exactly when an enemy
+    // swing is coming at them - it looked like the parry did nothing. The
+    // weapon cooldown is not checked either: this is a defensive move, and
+    // its own damage still goes through the hit window later.
+    if (Input::GetKeyTrigger(VK_RBUTTON) && !m_SpecialAttacking)
     {
         StartRightAttack();
     }
@@ -353,7 +324,7 @@ void Player::Update()
     // the recovery frames to play out. CanUse() keeps a swing from starting
     // at all when the weapon could not damage anything, so there are no
     // empty swings.
-    if (m_AttackQueued && m_Weapon->CanUse())
+    if (m_AttackQueued && m_Weapon->CanUse() && !IsParrying())
     {
         bool canStart = !m_Attacking ||
             (m_AttackHitDone &&
@@ -563,6 +534,7 @@ void Player::StartCounterAttack()
     m_AttackHitDone = false;
     m_SpecialAttacking = true;
     m_ParryTimer = m_ParryTime; // the deflect is live from the first frame
+    m_AttackQueued = false;     // a press buffered before this must not chain out of it
 
     Vector3 forward = GetFoward();
     m_Velocity.x += forward.x * m_AttackLunge;

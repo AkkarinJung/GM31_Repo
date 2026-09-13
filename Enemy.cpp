@@ -12,7 +12,7 @@
 #include "Stats.h"
 #include "DamageNumber.h"
 #include "Player.h"
-#include "Box.h"
+#include "Collision.h"
 #include <algorithm>
 #define NOMINMAX
 #include <cmath>
@@ -76,7 +76,6 @@ void Enemy::Update()
         m_Flash = false;
     }
 
-    Vector3 oldPosition = m_Position;
 
     // -----------------------------
     // Act on the AI's decisions - the AI only decides, moving is done here
@@ -88,47 +87,30 @@ void Enemy::Update()
     m_Velocity.y = m_AI->IsFlying() ? moveDirection.y * moveSpeed : 0.0f;
     m_Velocity.z = 0.0f;
 
-    m_Position += m_Velocity * dt;
+    std::vector<AABB> solids = Collision::GatherSolids();
 
-    if (!m_AI->IsFlying())
+    if (m_AI->IsFlying())
     {
+        m_Position += m_Velocity * dt; // fliers pass over crates
+    }
+    else
+    {
+        // One axis at a time, same as the player.
+        Collision::MoveX(m_Position, m_BodyHalfSize, m_Velocity.x * dt, solids);
+
+        bool landed = false;
+        Collision::MoveY(m_Position, m_BodyHalfSize, m_Velocity.y * dt, solids, landed);
+
         MeshField* meshField = Manager::GetGameObj<MeshField>();
         if (meshField != nullptr)
-            m_Position.y = meshField->GetHeight(m_Position);
+        {
+            float ground = meshField->GetHeight(m_Position);
+            if (m_Position.y < ground)
+                m_Position.y = ground;
+        }
     }
 
     m_Position.z = 0.0f; // the player is locked to this plane, so enemies are too
-
-    // Crates are solid for walking enemies too - they used to stroll
-    // straight through. Fliers pass over them.
-    if (!m_AI->IsFlying())
-    {
-        auto boxes = Manager::GetGameObjs<Box>();
-        for (auto box : boxes)
-        {
-            Vector3 boxPosition = box->GetPosition();
-            Vector3 boxScale = box->GetScale();
-
-            if (boxPosition.x - boxScale.x < m_Position.x &&
-                m_Position.x < boxPosition.x + boxScale.x &&
-                boxPosition.z - boxScale.z < m_Position.z &&
-                m_Position.z < boxPosition.z + boxScale.z)
-            {
-                if (boxPosition.y + boxScale.y < m_Position.y &&
-                    m_Position.y < boxPosition.y + boxScale.y * 2.0f)
-                {
-                    // standing on the crate
-                    m_Position.y = boxPosition.y + boxScale.y * 2.0f;
-                }
-                else if (boxPosition.y - boxScale.y < m_Position.y &&
-                    m_Position.y < boxPosition.y + boxScale.y)
-                {
-                    // walked into the side - stay where it was
-                    m_Position.x = oldPosition.x;
-                }
-            }
-        }
-    }
 
     // The AI asking for an attack starts the telegraph; the hit lands when
     // the telegraph runs out.
@@ -221,17 +203,60 @@ void Enemy::Update()
             n = delta * (1.0f / dist);
         }
 
-        // positional correction
+        // positional correction, weighted by mass - and an enemy mid swing
+        // counts as immovable, so its neighbours flow around it instead of
+        // jostling it off its target.
         float penetration = minDist - dist;
-        float totalMass = m_Mass + other->m_Mass;
+
+        float massA = m_AttackPending ? 1000.0f : m_Mass;
+        float massB = other->m_AttackPending ? 1000.0f : other->m_Mass;
+
+        float totalMass = massA + massB;
         if (totalMass < 0.00001f) totalMass = 1.0f;
 
-        float moveA = penetration * (other->m_Mass / totalMass);
-        float moveB = penetration * (m_Mass / totalMass);
+        float moveA = penetration * (massB / totalMass);
+        float moveB = penetration * (massA / totalMass);
 
         m_Position += n * moveA;
         other->m_Position -= n * moveB;
     }
+
+    // Step out of the player rather than pushing it. The player owns its own
+    // position - input, gravity and solids move it and nothing else - so an
+    // enemy crowding it just stops against it, and two enemies either side
+    // settle instead of batting the player back and forth.
+    Player* player = Manager::GetGameObj<Player>();
+    if (player != nullptr)
+    {
+        Vector3 delta = m_Position - player->GetPosition();
+        delta.y = 0.0f;
+
+        float distance = delta.lenght();
+
+        // Winding up an attack plants the enemy: walking into a telegraphing
+        // enemy no longer shoves it out of its swing, so the tell cannot be
+        // cancelled just by pressing into it.
+        if (distance < m_PlayerSeparation && !m_AttackPending)
+        {
+            if (distance > 0.0001f)
+                delta /= distance;
+            else
+                delta = Vector3(1.0f, 0.0f, 0.0f); // exactly on top - pick a side
+
+            // Give ground in proportion to how light it is. The push repeats
+            // every frame the player keeps pressing, so a heavy enemy still
+            // ends up clear - it just takes longer.
+            float give = (m_Mass > 0.0001f) ? (1.0f / m_Mass) : 1.0f;
+            if (give > 1.0f) give = 1.0f;
+            if (give < m_PushGiveMin) give = m_PushGiveMin;
+
+            m_Position += delta * ((m_PlayerSeparation - distance) * give);
+        }
+    }
+
+    // The separations above are soft pushes; crates still win.
+    if (!m_AI->IsFlying())
+        Collision::PushOutOfSolids(m_Position, m_BodyHalfSize, solids);
 
     Vector3 shadowPos = m_Position;
     shadowPos.y = 0.01f;

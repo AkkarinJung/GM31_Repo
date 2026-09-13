@@ -9,11 +9,11 @@
 //
 // Two rules the layouts have to respect, both from Player.cpp:
 //
-//  * A crate is only climbable while Scale.y is under the jump apex (1.877
-//    with JumpPower 20 and gravity 98). Player.cpp only snaps the player on
-//    top when y rises above Position.y + Scale.y; anything taller is a solid
-//    wall that seals off everything behind it - and a stage whose last enemy
-//    sits behind a wall can never be cleared.
+//  * A crate is only climbable while its TOP is under the jump apex. The top
+//    is Scale.y * 2 - crates stand on their position - and the apex is 2.98
+//    with JumpPower 25 and gravity 98, so Scale.y has to stay under about
+//    1.4. A taller crate is a wall that seals off everything behind it, and
+//    a stage whose last enemy sits behind a wall can never be cleared.
 //
 //  * A crate covers x from Position.x - Scale.x to Position.x + Scale.x.
 //    Enemies have no crate collision, so one spawned inside that span starts
