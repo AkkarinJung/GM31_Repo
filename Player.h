@@ -13,7 +13,6 @@ private:
     ID3D11PixelShader* m_PixelShader;
 
     bool m_Ground = true;
-    float m_MoveAnimation = 0.0f;
 
     // Collision body: half width, half height, half depth, standing on
     // m_Position. Everything solid is resolved against this one box.
@@ -29,7 +28,6 @@ private:
     float m_JumpPower = 25.0f;
     class Audio* m_JumpSE;
 
-    GameObject* m_Child;
     GameObject* m_Shadow;
 
     class AnimationModel* m_AnimationModel;
@@ -55,7 +53,7 @@ private:
     // Update(), then press P and copy the numbers back here.
     Vector3 m_WeaponOffsetPos{ -4.6667f, 7.6667f, 0.0000f };
     Vector3 m_WeaponOffsetRot{ 0.0000f, 0.0000f, -1.0000f };
-    class Sword* m_Weapon;
+    class Weapon* m_Weapon; // base type on purpose - Use()/LoadModel() are virtual
 
     bool m_FreezeAnimation = false;
 

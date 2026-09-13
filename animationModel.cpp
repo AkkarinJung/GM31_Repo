@@ -325,7 +325,7 @@
 		aiAnimation* animation1 = m_Animation[AnimationName1]->mAnimations[0];
 		aiAnimation* animation2 = m_Animation[AnimationName2]->mAnimations[0];
 
-		for (auto pair : m_Bone)
+		for (auto& pair : m_Bone)
 		{
 			BONE* bone = &m_Bone[pair.first];
 

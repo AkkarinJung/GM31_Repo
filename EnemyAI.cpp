@@ -25,6 +25,22 @@ EnemyAIConfig EnemyAIConfig::Patroller()
     config.PatrolSpeed = 1.5f;
     config.PatrolPause = 0.5f;
     config.FaceTarget = false;
+
+    // It still will not chase - that is what makes it a patroller - but it
+    // defends itself when something walks into it. Without this the enemy
+    // nearest the player's spawn just absorbed hits and never swung back,
+    // which reads as a broken enemy rather than as a design choice.
+    config.CanAttack = true;
+    config.AttackRange = 1.3f;
+    config.AttackHeight = 1.5f;
+    config.AttackCooldown = 2.2f;  // slower than a Walker - it is not a fighter
+    config.AttackDuration = 0.75f;
+
+    // It has to notice the player to swing at one, and DetectRange defaults
+    // to 0. Just past its own reach: enough to answer someone standing on it,
+    // not enough to go looking.
+    config.DetectRange = 2.0f;
+    config.LoseRange = 3.0f;
     return config;
 }
 
@@ -35,11 +51,16 @@ EnemyAIConfig EnemyAIConfig::Walker()
     config.DetectRange = 6.0f;
     config.LoseRange = 9.0f;
     config.ChaseSpeed = 3.0f;
-    config.StopDistance = 1.5f; // must stay outside the 1.4 player/enemy collision floor in Player::Update
+    config.StopDistance = 1.1f; // matches Enemy's separation - it closes to contact
     config.CanAttack = true;
-    config.AttackRange = 1.7f;
-    config.AttackCooldown = 1.2f;
-    config.AttackDuration = 0.9f; // long enough for the telegraph to be read and answered
+    config.AttackRange = 1.4f; // just past touching - see m_AttackHeight in Enemy.h
+    config.AttackHeight = 1.5f;
+    // The enemy cannot move while attacking, so these two together decide how
+    // much of its life it spends frozen. 0.75 of every 1.8 is ~40%, which
+    // reads as "winds up, swings, recovers, comes at you again". At 0.9 of
+    // every 1.2 it was frozen 75% of the time and looked broken.
+    config.AttackCooldown = 1.8f;
+    config.AttackDuration = 0.75f; // telegraph is 70% of this - see Enemy.h
     config.FaceTarget = true;
     config.SeparationRadius = 1.4f;
     config.SeparationStrength = 1.0f;
@@ -50,9 +71,10 @@ EnemyAIConfig EnemyAIConfig::Turret()
 {
     EnemyAIConfig config;
     config.CanAttack = true;
-    config.AttackRange = 2.0f;
-    config.AttackCooldown = 1.5f;
-    config.AttackDuration = 0.9f;
+    config.AttackRange = 1.8f;    // it cannot move, so it needs a little more reach
+    config.AttackHeight = 1.8f;
+    config.AttackCooldown = 1.8f;
+    config.AttackDuration = 0.75f;
     config.DetectRange = 2.0f;
     config.LoseRange = 3.0f;
     return config;
@@ -65,11 +87,12 @@ EnemyAIConfig EnemyAIConfig::Flyer()
     config.DetectRange = 7.0f;
     config.LoseRange = 10.0f;
     config.ChaseSpeed = 2.2f;
-    config.StopDistance = 1.5f;
+    config.StopDistance = 1.2f;
     config.CanAttack = true;
-    config.AttackRange = 1.6f;
-    config.AttackCooldown = 1.5f;
-    config.AttackDuration = 0.8f;
+    config.AttackRange = 1.4f;
+    config.AttackHeight = 3.0f;   // it hovers 2.5 above its target
+    config.AttackCooldown = 1.8f;
+    config.AttackDuration = 0.7f;
     config.Flying = true;
     config.HoverHeight = 2.5f;
     config.BobAmplitude = 0.3f;
@@ -153,8 +176,18 @@ void EnemyAI::DecideState()
     float distance = HorizontalDistanceToTarget();
     bool detected = TargetDetected(distance);
 
+    // Vertical gap as well as horizontal. Deciding on horizontal distance
+    // alone meant an enemy committed to a swing it could not reach, spending
+    // its whole attack state and cooldown standing frozen with nothing to
+    // show for it.
+    float verticalGap = (m_Target != nullptr)
+        ? fabsf(m_Target->GetPosition().y - m_GameObject->GetPosition().y)
+        : 0.0f;
+
     if (m_Config.CanAttack && detected &&
-        distance <= m_Config.AttackRange && m_AttackCooldownTimer <= 0.0f)
+        distance <= m_Config.AttackRange &&
+        verticalGap <= m_Config.AttackHeight &&
+        m_AttackCooldownTimer <= 0.0f)
     {
         SetState(EnemyState::Attack);
         m_AttackRequested = true;
@@ -193,15 +226,7 @@ void EnemyAI::Steer()
 
     bool canMove = (m_State != EnemyState::Stunned && m_State != EnemyState::Attack);
 
-    if (m_Config.ScriptedMove)
-    {
-        if (canMove)
-        {
-            m_MoveDirection = m_Config.ScriptedMove(*this, DELTA_TIME);
-            m_MoveSpeed = 1.0f; // the script's vector carries its own magnitude
-        }
-    }
-    else if (canMove)
+    if (canMove)
     {
         switch (m_State)
         {

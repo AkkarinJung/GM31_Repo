@@ -38,8 +38,9 @@ struct RoguelikeReward
 {
     RewardCategory Category = RewardCategory::Common;
     int Stat = 0;           // a CommonStat or a WeaponStat, depending on Category
-    float Value = 0.0f;     // flat amount, or a ratio when Percent is true
-    bool Percent = false;   // true: 0.15f means "+15%", false: 10.0f means "+10"
+    float Value = 0.0f;     // flat amount for some stats, a ratio for others -
+                            // which is which is decided by the apply switch in
+                            // RoguelikeSystem.cpp, and spelled out in Name
     const char* Name = "";  // short label, e.g. "+20 Max HP"
 };
 
@@ -48,18 +49,18 @@ struct RoguelikeReward
 // them is still a plain RoguelikeReward that can be copied and stored by
 // value:
 //
-//   CommonReward health(CommonStat::MaxHP, 20.0f, false, "+20 Max HP");
-//   WeaponReward damage(WeaponStat::Damage, 0.15f, true, "+15% Damage");
+//   CommonReward health(CommonStat::MaxHP, 20.0f, "+20 Max HP");
+//   WeaponReward damage(WeaponStat::Damage, 0.15f, "+15% Damage");
 struct CommonReward : public RoguelikeReward
 {
-    CommonReward(CommonStat Stat, float Value, bool Percent, const char* Name)
-        : RoguelikeReward{ RewardCategory::Common, (int)Stat, Value, Percent, Name } {
+    CommonReward(CommonStat Stat, float Value, const char* Name)
+        : RoguelikeReward{ RewardCategory::Common, (int)Stat, Value, Name } {
     }
 };
 
 struct WeaponReward : public RoguelikeReward
 {
-    WeaponReward(WeaponStat Stat, float Value, bool Percent, const char* Name)
-        : RoguelikeReward{ RewardCategory::Weapon, (int)Stat, Value, Percent, Name } {
+    WeaponReward(WeaponStat Stat, float Value, const char* Name)
+        : RoguelikeReward{ RewardCategory::Weapon, (int)Stat, Value, Name } {
     }
 };

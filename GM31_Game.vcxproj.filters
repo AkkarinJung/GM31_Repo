@@ -129,9 +129,6 @@
     <ClCompile Include="HPBar.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
-    <ClCompile Include="MPBar.cpp">
-      <Filter>Source Files\UI</Filter>
-    </ClCompile>
     <ClCompile Include="DamageNumber.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
@@ -139,6 +136,27 @@
       <Filter>Source Files\Enemy</Filter>
     </ClCompile>
     <ClCompile Include="EnemyAI.cpp">
+      <Filter>Source Files\Enemy</Filter>
+    </ClCompile>
+    <ClCompile Include="ControlsUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Font.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RoguelikeSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RoguelikeUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="StageUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EnemyHPBar.cpp">
       <Filter>Source Files\Enemy</Filter>
     </ClCompile>
   </ItemGroup>
@@ -248,9 +266,6 @@
     <ClInclude Include="HPBar.h">
       <Filter>Header Files\UI</Filter>
     </ClInclude>
-    <ClInclude Include="MPBar.h">
-      <Filter>Header Files\UI</Filter>
-    </ClInclude>
     <ClInclude Include="DamageNumber.h">
       <Filter>Header Files\UI</Filter>
     </ClInclude>
@@ -262,6 +277,30 @@
     </ClInclude>
     <ClInclude Include="RotationUtil.h">
       <Filter>Header Files\WeaponClass</Filter>
+    </ClInclude>
+    <ClInclude Include="ControlsUI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RoguelikeReward.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RoguelikeSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RoguelikeUI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="StageUI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EnemyHPBar.h">
+      <Filter>Header Files\Enemy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -286,6 +325,8 @@
     <FxCompile Include="shader\litTextureVS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+    <FxCompile Include="shader\toonPS.hlsl" />
+    <FxCompile Include="shader\toonVS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="DirectXTex\DirectXTex.inl">

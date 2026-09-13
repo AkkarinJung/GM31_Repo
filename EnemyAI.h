@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <functional>
 
 #include "component.h"
 #include "Vector3.h"
@@ -44,6 +43,9 @@ struct EnemyAIConfig
     // Attack.
     bool  CanAttack = false;
     float AttackRange = 1.2f;
+    float AttackHeight = 1.5f;   // vertical band it will commit to a swing in -
+                                 // keeps a grounded enemy from attacking a
+                                 // player standing on a crate above it
     float AttackCooldown = 1.5f;
     float AttackDuration = 0.4f; // how long the Attack state holds, i.e. the swing window
 
@@ -63,11 +65,6 @@ struct EnemyAIConfig
 
     float StunTime = 0.3f;
     bool  FaceTarget = true;     // false = face whichever way it is moving
-
-    // Fully scripted movement. When set it replaces all steering above and
-    // returns a desired move vector for this frame; states and attacks still
-    // run as normal, so a scripted enemy can still be stunned or killed.
-    std::function<Vector3(const EnemyAI&, float)> ScriptedMove;
 
     // Presets - the intended way to add a new enemy "type".
     static EnemyAIConfig Patroller(); // walks a fixed beat, never reacts to the player
@@ -139,6 +136,7 @@ public:
 
     // What the owner needs to time its own swing against.
     float GetAttackRange() const { return m_Config.AttackRange; }
+    float GetAttackHeight() const { return m_Config.AttackHeight; }
     float GetAttackDuration() const { return m_Config.AttackDuration; }
 
     // Events the owner reports back in.

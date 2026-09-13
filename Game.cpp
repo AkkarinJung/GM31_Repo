@@ -24,7 +24,6 @@
 #include "Result.h"
 
 #include "HPBar.h"
-#include "MPBar.h"
 #include "ControlsUI.h"
 
 #include "StageUI.h"
@@ -137,8 +136,8 @@ void Game::Init()
 	Manager::AddGameObj<Particle>()->SetPosition({ -2.0f,1.0f,-1.0f });
 
 	Manager::AddGameObj<Score>()->SetPosition({ 100.0f,100.0f,0.0f });
-	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
-	Manager::AddGameObj<MPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
+	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, BarStat::HP, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
+	Manager::AddGameObj<HPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, BarStat::MP, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
 	Manager::AddGameObj<ControlsUI>();
 	Manager::AddGameObj<StageUI>();
 	Manager::AddGameObj<EnemyHPBar>();

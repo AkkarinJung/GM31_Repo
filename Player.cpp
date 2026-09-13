@@ -10,9 +10,7 @@
 #include "Camera.h"
 #include "audio.h"
 
-#include "Enemy.h"
 #include "Tree.h"
-#include "Box.h"
 #include "Shadow.h"
 #include "MeshField.h"
 
@@ -60,12 +58,6 @@ void Player::Init()
     m_JumpSE = AddGameComponent<Audio>(this);
     m_JumpSE->Load("asset\\Audio\\wan.wav");
 
-    m_Child = Manager::AddGameObj<GameObject>();
-    m_Child->SetParent(this);
-    m_Child->SetPosition({ 0.0f,2.0f,0.0f });
-
-    //ModelRenderer* childModel = m_Child->AddGameComponent<ModelRenderer>(m_Child);
-    //childModel->Load("asset\\model\\Rabbit\\rabbit_1.obj");
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 1.5f ,1.5f ,1.5f });
 
@@ -105,10 +97,6 @@ void Player::Update()
 
     if (Input::GetKeyTrigger(VK_F4))
         DebugDumpSwing("Attack1", "mixamorig:RightHand");
-
-    //Vector3 rot = m_Child->GetRotation();
-    //rot.y += 1.0f * dt;
-    //m_Child->SetRotation(rot);
 
     bool oldGround = m_Ground;
     m_Ground = false;
@@ -232,9 +220,6 @@ void Player::Update()
         }
     }
 
-    // Enemies nudge the player apart first; the crates below then get the
-    // final say. Resolving crates first let an enemy shove the player inside
-    // one, and the next frame's push-back reverted to a position that was
     // Enemies are deliberately not resolved here. Nothing but input, gravity
     // and solid geometry is allowed to move the player: an enemy that walks
     // into the player steps out of the player instead (see Enemy::Update).
@@ -340,12 +325,6 @@ void Player::Update()
     if (!m_Attacking)
     {
         m_ComboResetTimer += dt;
-    }
-
-    if (m_Ground)
-    {
-        //m_MoveAnimation += VectorMag(m_Velocity) * dt;
-        //m_Scale.y += sinf(m_MoveAnimation * 3.0f) * 0.03f;
     }
 
     // keep the player pinned to the scrolling plane - collision push-out

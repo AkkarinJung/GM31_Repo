@@ -30,7 +30,6 @@ public:
 	void Update() override;
 	void Draw() override;
 
-	RoguelikeSystem& GetRoguelike() { return m_Roguelike; }
 
 	static int GetStageIndex() { return s_Stage; }
 	static bool IsRunComplete() { return s_RunComplete; }

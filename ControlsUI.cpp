@@ -254,7 +254,7 @@ void ControlsUI::Draw()
 
     if (!m_Open)
     {
-        // closed - just the hint, so F1 is discoverable
+        // closed - just the hint, so the panel is discoverable
         float hintX = 24.0f;
         float hintY = SCREEN_HEIGHT - 48.0f;
 

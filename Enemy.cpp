@@ -84,7 +84,11 @@ void Enemy::Update()
     float moveSpeed = m_AI->GetMoveSpeed();
 
     m_Velocity.x = moveDirection.x * moveSpeed;
-    m_Velocity.y = m_AI->IsFlying() ? moveDirection.y * moveSpeed : 0.0f;
+    // Fliers steer their own altitude. Ground enemies keep whatever falling
+    // speed they have built up - assigning 0 here meant the gravity added
+    // below never accumulated, so they sank at a constant crawl.
+    if (m_AI->IsFlying())
+        m_Velocity.y = moveDirection.y * moveSpeed;
     m_Velocity.z = 0.0f;
 
     std::vector<AABB> solids = Collision::GatherSolids();
@@ -95,25 +99,39 @@ void Enemy::Update()
     }
     else
     {
+        // Ground enemies fall, exactly like the player. Without this nothing
+        // ever brought one back down: the crate push-out resolves along
+        // whichever axis is shallower and can lift an enemy onto a crate, and
+        // a hovering enemy telegraphs its swing but can never land it,
+        // because AttackTarget checks vertical reach.
+        m_Velocity.y -= m_Gravity * dt;
+
         // One axis at a time, same as the player.
         Collision::MoveX(m_Position, m_BodyHalfSize, m_Velocity.x * dt, solids);
 
         bool landed = false;
-        Collision::MoveY(m_Position, m_BodyHalfSize, m_Velocity.y * dt, solids, landed);
+        if (Collision::MoveY(m_Position, m_BodyHalfSize, m_Velocity.y * dt, solids, landed))
+            m_Velocity.y = 0.0f;
 
         MeshField* meshField = Manager::GetGameObj<MeshField>();
         if (meshField != nullptr)
         {
             float ground = meshField->GetHeight(m_Position);
             if (m_Position.y < ground)
+            {
                 m_Position.y = ground;
+                m_Velocity.y = 0.0f;
+            }
         }
     }
 
     m_Position.z = 0.0f; // the player is locked to this plane, so enemies are too
 
-    // The AI asking for an attack starts the telegraph; the hit lands when
-    // the telegraph runs out.
+    // The AI asking for an attack starts the telegraph; the hit lands when the
+    // telegraph runs out. The AI checks reach before committing (range and
+    // vertical band), so anything it asks for here is worth announcing - the
+    // swing can still whiff if the player leaves during the wind-up, which is
+    // what AttackTarget re-checks.
     if (m_AI->ConsumeAttack())
     {
         m_AttackWindupTime = m_AI->GetAttackDuration() * m_AttackWindupRatio;
@@ -184,7 +202,11 @@ void Enemy::Update()
         if (other == this) continue;
         if (this > other) continue; // resolve pair once
 
+        // Horizontal only. A 3D push let two enemies at different heights
+        // shove each other up and, with no gravity, that used to be permanent.
         Vector3 delta = m_Position - other->m_Position;
+        delta.y = 0.0f;
+
         float distSq = delta * delta;
         float minDist = m_Radius + other->m_Radius;
         float minDistSq = minDist * minDist;
@@ -280,6 +302,32 @@ void Enemy::Draw()
     GameObject::Draw();
 }
 
+bool Enemy::CanReachTarget() const
+{
+    GameObject* target = m_AI->GetTarget();
+    if (target == nullptr)
+        return false;
+
+    Vector3 toTarget = target->GetPosition() - m_Position;
+    toTarget.y = 0.0f;
+
+    if (toTarget.lenght() > m_AI->GetAttackRange() + m_AttackSlack)
+        return false;
+
+    // Vertical reach. Positions are at the feet, so an enemy hovering above
+    // the target still connects with its head, while one on the ground
+    // cannot reach a target standing on a crate over it.
+    float dy = m_Position.y - target->GetPosition().y;
+    float verticalGap = 0.0f;
+
+    if (dy > m_TargetHeight)
+        verticalGap = dy - m_TargetHeight;  // above the target's head
+    else if (dy < 0.0f)
+        verticalGap = -dy;                  // target is above this enemy
+
+    return verticalGap <= m_AI->GetAttackHeight();
+}
+
 void Enemy::AttackTarget()
 {
     GameObject* target = m_AI->GetTarget();
@@ -288,10 +336,7 @@ void Enemy::AttackTarget()
 
     // The telegraph is a real window: leaving the enemy's reach during it
     // makes the swing whiff.
-    Vector3 toTarget = target->GetPosition() - m_Position;
-    toTarget.y = 0.0f;
-
-    if (toTarget.lenght() > m_AI->GetAttackRange() + 0.4f)
+    if (!CanReachTarget())
         return;
 
     // Parried: no damage, and the enemy is left open for far longer than a

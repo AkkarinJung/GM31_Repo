@@ -3,13 +3,40 @@
 #include "HPBar.h"
 #include "Stats.h"
 
-void HPBar::Init(float X, float Y, float Width, float Height, GameObject* Target, const WCHAR* FillTextureName)
+// The one place that reads a stat off the target, so HP and MP bars cannot
+// drift apart the way HPBar and MPBar did.
+float HPBar::StatRatio() const
+{
+    if (m_Target == nullptr)
+        return 1.0f;
+
+    Stats* stats = m_Target->GetGameComponent<Stats>();
+    if (stats == nullptr)
+        return 1.0f;
+
+    int value = (m_Stat == BarStat::MP) ? stats->GetMP() : stats->GetHP();
+    int maximum = (m_Stat == BarStat::MP) ? stats->GetMaxMP() : stats->GetMaxHP();
+
+    if (maximum <= 0)
+        return 1.0f;
+
+    float ratio = (float)value / (float)maximum;
+
+    if (ratio < 0.0f) ratio = 0.0f;
+    if (ratio > 1.0f) ratio = 1.0f;
+
+    return ratio;
+}
+
+void HPBar::Init(float X, float Y, float Width, float Height, GameObject* Target,
+    BarStat Stat, const WCHAR* FillTextureName)
 {
     m_Layer = 4;
     m_X = X;
     m_Y = Y;
     m_Width = Width;
     m_Height = Height;
+    m_Stat = Stat;
     m_Target = Target;
 
     VERTEX_3D bgVertex[4];
@@ -75,11 +102,7 @@ void HPBar::Init(float X, float Y, float Width, float Height, GameObject* Target
         fillImage.GetImageCount(), fillMetadata, &m_FillTexture);
     assert(m_FillTexture);
 
-    float ratio = 1.0f;
-    Stats* stats = m_Target != nullptr ? m_Target->GetGameComponent<Stats>() : nullptr;
-    if (stats != nullptr && stats->GetMaxHP() > 0)
-        ratio = (float)stats->GetHP() / (float)stats->GetMaxHP();
-    m_DisplayRatio = ratio;
+    m_DisplayRatio = StatRatio(); // start where the value already is
 }
 
 void HPBar::Uninit()
@@ -97,15 +120,7 @@ void HPBar::Uninit()
 
 void HPBar::Update()
 {
-    float targetRatio = 1.0f;
-    if (m_Target != nullptr)
-    {
-        Stats* stats = m_Target->GetGameComponent<Stats>();
-        if (stats != nullptr && stats->GetMaxHP() > 0)
-            targetRatio = (float)stats->GetHP() / (float)stats->GetMaxHP();
-    }
-    if (targetRatio < 0.0f) targetRatio = 0.0f;
-    if (targetRatio > 1.0f) targetRatio = 1.0f;
+    float targetRatio = StatRatio();
 
     // move the displayed value toward the real one a little each frame,
     // instead of snapping instantly, so it reads as draining/filling

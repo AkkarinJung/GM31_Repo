@@ -11,20 +11,22 @@
 
 // The reward pool. This table is the only thing that has to change to add,
 // remove or retune a reward - everything below just reads it.
+// Each line is: stat, amount, label. Whether the amount is flat or a ratio is
+// decided by the apply switch further down, and spelled out in the label.
 // 4th arg: false = flat amount (5.0f -> "+5"), true = ratio (0.20f -> "+20%")
 static const RoguelikeReward s_RewardPool[] =
 {
-    CommonReward(CommonStat::MaxHP,          20.0f, false, "+20 Max HP"),
-    CommonReward(CommonStat::AttackPower,     3.0f, false, "+3 Attack"),
-    CommonReward(CommonStat::Defense,         2.0f, false, "+2 Defense"),
-    CommonReward(CommonStat::CriticalChance,  0.10f, true, "+10% Critical Chance"),
-    CommonReward(CommonStat::MoveSpeed,       0.10f, true, "+10% Move Speed"),
-    CommonReward(CommonStat::JumpPower,       0.15f, true, "+15% Jump Power"),
+    CommonReward(CommonStat::MaxHP,          20.0f, "+20 Max HP"),
+    CommonReward(CommonStat::AttackPower,     3.0f, "+3 Attack"),
+    CommonReward(CommonStat::Defense,         2.0f, "+2 Defense"),
+    CommonReward(CommonStat::CriticalChance,  0.10f, "+10% Critical Chance"),
+    CommonReward(CommonStat::MoveSpeed,       0.10f, "+10% Move Speed"),
+    CommonReward(CommonStat::JumpPower,       0.15f, "+15% Jump Power"),
 
-    WeaponReward(WeaponStat::Damage,          0.15f, true, "+15% Weapon Damage"),
-    WeaponReward(WeaponStat::AttackSpeed,     0.10f, true, "+10% Attack Speed"),
-    WeaponReward(WeaponStat::Range,           0.20f, true, "+20% Range"),
-    WeaponReward(WeaponStat::CriticalDamage,  0.25f, true, "+25% Critical Damage"),
+    WeaponReward(WeaponStat::Damage,          0.15f, "+15% Weapon Damage"),
+    WeaponReward(WeaponStat::AttackSpeed,     0.10f, "+10% Attack Speed"),
+    WeaponReward(WeaponStat::Range,           0.20f, "+20% Range"),
+    WeaponReward(WeaponStat::CriticalDamage,  0.25f, "+25% Critical Damage"),
 };
 
 static const int s_RewardPoolSize = (int)(sizeof(s_RewardPool) / sizeof(s_RewardPool[0]));

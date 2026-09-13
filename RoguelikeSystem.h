@@ -53,5 +53,4 @@ public:
     // Clear the run's rewards. Call when a new run starts (Game::ResetProgress
     // does), never between stages.
     static void ResetRun() { s_Taken.clear(); }
-    static int GetTakenCount() { return (int)s_Taken.size(); }
 };

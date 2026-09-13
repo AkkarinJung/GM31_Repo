@@ -2,8 +2,8 @@
 #include "GameObject.h"
 
 // Controls panel: one row per binding, drawn from the input prompt sheet
-// with a label next to it. F1 toggles it, and a small hint sits in the
-// corner so the player knows F1 does something.
+// with a label next to it. TAB toggles it, and a small hint sits in the
+// corner so the player knows TAB does something. (F1 is the debug camera.)
 //
 // Presentation only - it reads no gameplay state and changes none. The
 // binding list at the top of ControlsUI.cpp is the whole content, so adding
@@ -39,6 +39,4 @@ public:
     void Update() override;
     void Draw() override;
 
-    void SetOpen(bool Open) { m_Open = Open; }
-    bool IsOpen() const { return m_Open; }
 };

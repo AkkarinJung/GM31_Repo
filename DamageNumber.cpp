@@ -9,12 +9,17 @@
 
 void DamageNumber::Init(const Vector3& WorldPosition, int Value, bool ShowSign, const XMFLOAT4& Color)
 {
-    m_Layer = 4; // same UI layer as Score/HPBar/MPBar - Manager::Draw only walks layers 0-4
+    m_Layer = 4; // same UI layer as Score/HPBar - Manager::Draw only walks layers 0-4
     m_Value = Value;
     m_ShowSign = ShowSign;
     m_Color = Color;
 
     Camera* camera = Manager::GetGameObj<Camera>();
+    if (camera == nullptr)
+    {
+        SetDestory();
+        return;
+    }
 
     XMVECTOR worldPos = XMVectorSet(WorldPosition.x, WorldPosition.y, WorldPosition.z, 1.0f);
     XMVECTOR screenPos = XMVector3Project(worldPos,
@@ -23,6 +28,16 @@ void DamageNumber::Init(const Vector3& WorldPosition, int Value, bool ShowSign, 
 
     XMFLOAT3 screen;
     XMStoreFloat3(&screen, screenPos);
+
+    // Behind the camera: the projection mirrors those points back into view,
+    // so a kill just off screen drew its number over unrelated geometry.
+    // EnemyHPBar guards this; this did not.
+    if (screen.z < 0.0f || screen.z > 1.0f)
+    {
+        SetDestory();
+        return;
+    }
+
     m_Position = { screen.x, screen.y, 0.0f };
 
     VERTEX_3D vertex[4]{};
@@ -52,11 +67,14 @@ void DamageNumber::Init(const Vector3& WorldPosition, int Value, bool ShowSign, 
 
 void DamageNumber::Uninit()
 {
-    m_VertexBuffer->Release();
-    m_VertexLayout->Release();
-    m_VertexShader->Release();
-    m_PixelShader->Release();
-    m_Texture->Release();
+    // Init can bail out before creating anything (no camera, or the world
+    // position is behind it), and the object is destroyed that same frame -
+    // so none of these are guaranteed to exist.
+    if (m_VertexBuffer != nullptr) m_VertexBuffer->Release();
+    if (m_VertexLayout != nullptr) m_VertexLayout->Release();
+    if (m_VertexShader != nullptr) m_VertexShader->Release();
+    if (m_PixelShader != nullptr) m_PixelShader->Release();
+    if (m_Texture != nullptr) m_Texture->Release();
 }
 
 void DamageNumber::Update()

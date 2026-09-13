@@ -20,11 +20,22 @@ private:
     const float m_AttackWindupRatio = 0.7f; // of the AI's attack duration
     const float m_ParryStunTime = 1.2f;     // a parried enemy is left wide open
 
+    // A swing reaches sideways AND up/down. The vertical reach lives on the
+    // AI config (per type) so the decision to attack and the swing that
+    // follows cannot disagree - they did, and the mismatch burned a whole
+    // attack state and cooldown on a swing that was then rejected.
+    const float m_AttackSlack = 0.15f;  // grace for the player edging away during the telegraph
+    const float m_TargetHeight = 1.8f;  // how tall the thing it swings at is
+
     void AttackTarget();
+
+    // Is the target inside this enemy's swing right now? Used twice: to
+    // decide whether the telegraph is worth starting, and again when the
+    // swing lands, since the target may have walked out during the wind-up.
+    bool CanReachTarget() const;
 
     // Sine Wave
     float m_Time = 0.0f;
-    float m_Amplitude = 0.7f;
     float m_Frequency = 5.0f;
 
     float m_BaseScale = 0.7f; // overall size multiplier - shrink the enemy a bit; tune to taste
@@ -32,6 +43,7 @@ private:
     // Collision / physics
     Vector3 m_Velocity = Vector3(0.0f, 0.0f, 0.0f);
     float m_Radius = 1.0f;
+    const float m_Gravity = 98.0f; // same pull the player gets
 
     // Collision body, standing on m_Position - the same box the player uses,
     // resolved by the same code.
@@ -88,8 +100,5 @@ public:
     void SetMass(float Mass) { m_Mass = Mass; }
     float GetMass() const { return m_Mass; }
 
-    // True while the swing is telegraphing. An enemy committed to an attack
-    // plants itself - it cannot be shoved out of its own swing.
-    bool IsWindingUp() const { return m_AttackPending; }
 
 };
