@@ -49,6 +49,12 @@
     <Filter Include="Source Files\VisualEffect">
       <UniqueIdentifier>{2e86eb47-07fb-4e2c-9ea2-c1aedfe55d35}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Enviroment">
+      <UniqueIdentifier>{ccf34e36-c2c2-4cfe-8bb0-985a32f0d77f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Enviroment">
+      <UniqueIdentifier>{692907bb-2f55-44ae-a86f-c3f5e00a9f81}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -61,9 +67,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Polygon2D.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="field.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
@@ -79,18 +82,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Bullet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Tree.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Grass.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Explosion.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SkyDome.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Box.cpp">
@@ -111,16 +102,7 @@
     <ClCompile Include="Result.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Score.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Shadow.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="animationModel.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MeshField.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Weapon.cpp">
@@ -181,7 +163,34 @@
       <Filter>Source Files\UI</Filter>
     </ClCompile>
     <ClCompile Include="Hedge.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="Grass.cpp">
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="SkyDome.cpp">
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="field.cpp">
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshField.cpp">
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="Prop.cpp">
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="Explosion.cpp">
+      <Filter>Source Files\VisualEffect</Filter>
+    </ClCompile>
+    <ClCompile Include="Score.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Tree.cpp">
+      <Filter>Source Files\Enviroment</Filter>
+    </ClCompile>
+    <ClCompile Include="Shadow.cpp">
+      <Filter>Source Files\VisualEffect</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -202,9 +211,6 @@
     </ClInclude>
     <ClInclude Include="DirectXTex\DirectXTex.h">
       <Filter>DirectXTex</Filter>
-    </ClInclude>
-    <ClInclude Include="field.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
@@ -227,21 +233,6 @@
     <ClInclude Include="Bullet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Tree.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Grass.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Explosion.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SkyDome.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Box.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Collision.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -257,16 +248,7 @@
     <ClInclude Include="Result.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Score.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Shadow.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="animationModel.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MeshField.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Sword.h">
@@ -335,8 +317,38 @@
     <ClInclude Include="StatsUI.h">
       <Filter>Header Files\UI</Filter>
     </ClInclude>
+    <ClInclude Include="Box.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="Prop.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="Tree.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="field.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="Grass.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
     <ClInclude Include="Hedge.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="Explosion.h">
+      <Filter>Header Files\VisualEffect</Filter>
+    </ClInclude>
+    <ClInclude Include="SkyDome.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="Score.h">
+      <Filter>Header Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshField.h">
+      <Filter>Header Files\Enviroment</Filter>
+    </ClInclude>
+    <ClInclude Include="Shadow.h">
+      <Filter>Header Files\VisualEffect</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

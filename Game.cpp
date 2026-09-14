@@ -27,6 +27,7 @@
 #include "ControlsUI.h"
 #include "StatsUI.h"
 #include "Hedge.h"
+#include "Prop.h"
 
 #include "StageUI.h"
 #include "EnemyHPBar.h"
@@ -109,6 +110,185 @@ static void BuildMapEdge()
 	}
 }
 
+// ---------------------------------------------------------------- scenery --
+//
+// COUNT_OF lives in Stage.cpp, which is a different translation unit.
+#ifndef COUNT_OF
+#define COUNT_OF(Array) ((int)(sizeof(Array) / sizeof(Array[0])))
+#endif
+//
+// Background dressing. All of it sits behind the plane the player walks on -
+// the camera looks down +z from z = -7, so anything at z = 0 would stand in
+// the fight, and anything in front of that would hide it.
+
+static const char* const s_TreeModels[] =
+{
+	"asset\\model\\Enviroment\\Tree\\tree.fbx",
+	"asset\\model\\Enviroment\\Tree Large\\tree_large.fbx",
+};
+
+static const char* const s_MidModels[] =
+{
+	"asset\\model\\Enviroment\\Bush\\bush.fbx",
+	"asset\\model\\Enviroment\\Bush Large\\bush_large.fbx",
+	"asset\\model\\Enviroment\\Bench\\bench.fbx",
+	"asset\\model\\Enviroment\\Street Lantern\\street_lantern.fbx",
+	"asset\\model\\Enviroment\\Trashcan\\trashcan.fbx",
+	"asset\\model\\Enviroment\\Hedge Straight\\hedge_straight.fbx",
+};
+
+static const char* const s_GroundModels[] =
+{
+	"asset\\model\\Enviroment\\Grass A\\grass_A.fbx",
+	"asset\\model\\Enviroment\\Grass B\\grass_B.fbx",
+	"asset\\model\\Enviroment\\Flower A\\flower_A.fbx",
+	"asset\\model\\Enviroment\\Flower B\\flower_B.fbx",
+	"asset\\model\\Enviroment\\Cobble Stones\\cobble_stones.fbx",
+	"asset\\model\\Enviroment\\Cobble Stones Large\\cobble_stones_large.fbx",
+	"asset\\model\\Enviroment\\Bird\\bird.fbx",
+};
+
+// One band of scenery: which models it draws from, how far back it sits, how
+// far apart the pieces are, and the range of sizes. Three of these stacked
+// back to front is what reads as depth rather than as a row of props.
+struct SceneryBand
+{
+	const char* const* Models;
+	int ModelCount;
+	float NearZ, FarZ;
+	float Spacing;            // average gap along x
+	float MinScale, MaxScale;
+};
+
+static const SceneryBand s_SceneryBands[] =
+{
+	// Furthest back, so the biggest and the most spread out.
+	{ s_TreeModels,   COUNT_OF(s_TreeModels),   10.0f, 15.0f, 7.0f, 0.90f, 1.30f },
+	{ s_MidModels,    COUNT_OF(s_MidModels),     5.0f,  8.5f, 5.5f, 0.85f, 1.15f },
+	// Just behind the player, small enough not to crowd the fight.
+	{ s_GroundModels, COUNT_OF(s_GroundModels),  2.5f,  4.5f, 3.2f, 0.80f, 1.20f },
+};
+
+// How far past the map edge the scenery keeps going, so the background does
+// not stop dead where the hedges do.
+static const float SCENERY_OVERHANG = 6.0f;
+
+// Fixed seed, so the background is the same every run instead of reshuffling
+// itself whenever a stage reloads.
+static unsigned int g_SceneryRandom = 0x2545f491u;
+
+static float SceneryRandom01()
+{
+	g_SceneryRandom ^= g_SceneryRandom << 13;
+	g_SceneryRandom ^= g_SceneryRandom >> 17;
+	g_SceneryRandom ^= g_SceneryRandom << 5;
+	return (g_SceneryRandom & 0xffffff) / (float)0x1000000;
+}
+
+static float SceneryRandomRange(float Min, float Max)
+{
+	return Min + (Max - Min) * SceneryRandom01();
+}
+
+// ------------------------------------------------------------- tree line --
+//
+// The scenery band above stops its mesh trees at 15 units. Past that a tree
+// is never more than a shape, so a mesh would be 400 triangles and its own
+// 4MB copy of the pack's atlas to say the same thing. Tree is the project's
+// own camera-facing quad, already pointed at asset\bill_board\tree.png and
+// already sharing that texture between every instance, so filling the horizon
+// is only a matter of placing them.
+
+// Tree's quad is 8 across and 10 tall in its own space, while tree.png is
+// 350x504. Scaling both axes by the same number would come out fat, so x is
+// pulled in to match the picture.
+static const float TREE_QUAD_WIDTH = 8.0f;
+static const float TREE_QUAD_HEIGHT = 10.0f;
+static const float TREE_IMAGE_ASPECT = 350.0f / 504.0f;
+
+// Far wider than the props nearer in. The view opens out with distance, so a
+// band as narrow as the play area ends in bare sky at the screen edges.
+static const float TREE_OVERHANG = 45.0f;
+
+struct TreeBand
+{
+	int Count;
+	float NearZ, FarZ;
+	float MinHeight, MaxHeight;
+};
+
+static const TreeBand s_TreeBands[] =
+{
+	{ 60, 18.0f, 34.0f, 4.5f, 7.0f },
+	// Smaller and denser, so the horizon sits behind the row in front of it.
+	{ 90, 36.0f, 72.0f, 3.5f, 5.5f },
+};
+
+static void BuildTreeLine()
+{
+	const float startX = Game::MapLeft - TREE_OVERHANG;
+	const float endX = Game::MapRight + TREE_OVERHANG;
+
+	for (int b = 0; b < COUNT_OF(s_TreeBands); b++)
+	{
+		const TreeBand& band = s_TreeBands[b];
+
+		for (int i = 0; i < band.Count; i++)
+		{
+			float height = SceneryRandomRange(band.MinHeight, band.MaxHeight);
+
+			Tree* tree = Manager::AddGameObj<Tree>();
+			tree->SetPosition({ SceneryRandomRange(startX, endX), 0.0f,
+				SceneryRandomRange(band.NearZ, band.FarZ) });
+
+			tree->SetScale({ height * TREE_IMAGE_ASPECT / TREE_QUAD_WIDTH,
+				height / TREE_QUAD_HEIGHT, 1.0f });
+
+			// Nothing this far back casts a shadow worth drawing.
+			tree->HideShadow();
+		}
+	}
+}
+
+static void BuildScenery()
+{
+	g_SceneryRandom = 0x2545f491u; // reset, so stage 2 looks like stage 1 did
+
+	const float startX = Game::MapLeft - SCENERY_OVERHANG;
+	const float endX = Game::MapRight + SCENERY_OVERHANG;
+
+	for (int b = 0; b < COUNT_OF(s_SceneryBands); b++)
+	{
+		const SceneryBand& band = s_SceneryBands[b];
+
+		for (float x = startX; x < endX; x += band.Spacing)
+		{
+			// Jitter inside the slot rather than placing on the slot, so the
+			// spacing does not read as a grid.
+			float px = x + SceneryRandomRange(-band.Spacing * 0.35f, band.Spacing * 0.35f);
+			float pz = SceneryRandomRange(band.NearZ, band.FarZ);
+
+			// The map edge hedges run from z = -6 to 6, so anything nearer
+			// than that at the same x would grow out of a wall.
+			if (pz < 7.0f &&
+				(fabsf(px - Game::MapLeft) < 2.5f || fabsf(px - Game::MapRight) < 2.5f))
+				continue;
+
+			const char* model = band.Models[(int)(SceneryRandom01() * band.ModelCount) % band.ModelCount];
+
+			Prop* prop = Manager::AddGameObj<Prop>();
+			prop->SetPosition({ px, 0.0f, pz });
+			prop->SetRotation({ 0.0f, SceneryRandomRange(0.0f, 6.2831853f), 0.0f });
+			prop->Load(model, SceneryRandomRange(band.MinScale, band.MaxScale));
+		}
+	}
+
+	// One landmark, off to the side of where the fighting happens.
+	Prop* fountain = Manager::AddGameObj<Prop>();
+	fountain->SetPosition({ 4.0f, 0.0f, 9.5f });
+	fountain->Load("asset\\model\\Enviroment\\Fountain\\fountain.fbx");
+}
+
 void Game::Init()
 {
 	
@@ -121,6 +301,8 @@ void Game::Init()
 	Player* player = Manager::AddGameObj<Player>();
 
 	BuildMapEdge();
+	BuildScenery();
+	BuildTreeLine();
 
 	// Everything that makes this stage different from the next comes out of
 	// the stage table - see Stage.cpp.

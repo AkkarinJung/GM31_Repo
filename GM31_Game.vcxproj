@@ -46,6 +46,7 @@
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Polygon2D.cpp" />
+    <ClCompile Include="Prop.cpp" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="Result.cpp" />
     <ClCompile Include="RoguelikeSystem.cpp" />
@@ -95,6 +96,7 @@
     <ClInclude Include="Particle.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Polygon2D.h" />
+    <ClInclude Include="Prop.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="Result.h" />
     <ClInclude Include="RoguelikeReward.h" />

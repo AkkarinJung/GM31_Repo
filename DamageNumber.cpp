@@ -64,7 +64,7 @@ void DamageNumber::Init(const Vector3& WorldPosition, int Value, bool ShowSign, 
 
     TexMetadata metadata;
     ScratchImage image;
-    LoadFromWICFile(L"asset\\texture\\number.png", WIC_FLAGS_NONE, &metadata, image);
+    LoadFromWICFile(L"asset\\texture\\number_gold.png", WIC_FLAGS_NONE, &metadata, image);
     CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
         image.GetImageCount(), metadata, &m_Texture);
     assert(m_Texture);

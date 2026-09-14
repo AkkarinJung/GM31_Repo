@@ -81,11 +81,22 @@ void Tree::Uninit()
 
     GameObject::Uninit();
 }
+void Tree::HideShadow()
+{
+    if (m_Shadow != nullptr)
+    {
+        m_Shadow->SetDestory();
+        m_Shadow = nullptr;
+    }
+}
 void  Tree::Update()
 {
-    Vector3 shadowPos = m_Position;
-    shadowPos.y = 0.01f;
-    m_Shadow->SetPosition(shadowPos);
+    if (m_Shadow != nullptr)
+    {
+        Vector3 shadowPos = m_Position;
+        shadowPos.y = 0.01f;
+        m_Shadow->SetPosition(shadowPos);
+    }
 
     GameObject::Update();
 }

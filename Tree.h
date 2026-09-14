@@ -19,6 +19,12 @@ private:
 	GameObject* m_Shadow;
 
 public:
+	// Init gives every tree a shadow, which is right for one standing next to
+	// the player and wrong for a hundred filling the horizon - the disc is 40
+	// units across and each one is another object. Called after the fact,
+	// because Init is what creates it.
+	void HideShadow();
+
 	void Init();
 	void Uninit();
 	void Update();
