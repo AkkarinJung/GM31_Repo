@@ -26,6 +26,10 @@ SamplerState g_SamplerState : register(s0);
 static const float3 ToonLightColor = float3(0.9f, 0.9f, 0.9f);
 static const float3 ToonAmbientColor = float3(0.3f, 0.3f, 0.3f);
 
+// How hard the relief below hits. Raise for a rockier surface, lower to
+// flatten it out. Parameter.w scales this, so leave it and use that first.
+static const float BumpContrast = 2.0f;
+
 
 // Parameter comes from Renderer::SetParameter, set in MeshField::Draw:
 //   x = which row of the ramp to read   y = AO strength
@@ -66,27 +70,27 @@ void main(in BUMP_PS_IN In, out float4 outDiffuse : SV_Target)
     float macroAmount = Parameter.z;
     float normalStrength = Parameter.w;
 
-    // Normal map off at strength 0: flattening xy leaves (0,0,1), which comes
-    // back out of the TBN as the plain surface normal. The texture is painted
-    // with its own light and shade, and a second set of bumps on top fights
-    // it - raise w only if you want the surface to catch the light as well.
+    float3 geomNormal = normalize(In.Normal.xyz);
+
     float3 tangentNormal = (g_TextureNormal.Sample(g_SamplerState, In.TexCoord).rgb * 2.0f) - 1.0f;
 #ifdef NORMALMAP_FLIP_GREEN
     tangentNormal.y = -tangentNormal.y;
 #endif
-    tangentNormal.xy *= normalStrength;
     tangentNormal = normalize(tangentNormal);
 
     float3x3 tbn = float3x3(normalize(In.Tangent.xyz),
 							normalize(In.Binormal.xyz),
-							normalize(In.Normal.xyz));
-    float3 normal = normalize(mul(tangentNormal, tbn));
+							geomNormal);
+    float3 bumpedNormal = normalize(mul(tangentNormal, tbn));
 
     float3 lv = normalize(-Light.Direction.xyz);
 
-    // Half lambert, so the ramp gets the full 0..1 range to work with rather
-    // than only the lit half. Same as toonPS.
-    float light = 0.5f + 0.5f * dot(normal, lv);
+    // The ramp reads the flat surface normal, not the bumped one. Its bands
+    // are far wider than the shift a normal map makes to N.L, so a bumped
+    // normal put through the ramp lands in the same band as its neighbours
+    // and the relief quantises away to nothing.
+    // Half lambert, so the ramp gets the full 0..1 range. Same as toonPS.
+    float light = 0.5f + 0.5f * dot(geomNormal, lv);
     light = clamp(light, 0.01f, 0.99f);
 
     // The ramp holds several looks stacked as rows; x picks which one.
@@ -98,6 +102,12 @@ void main(in BUMP_PS_IN In, out float4 outDiffuse : SV_Target)
     outDiffuse = g_Texture.Sample(g_SamplerState, In.TexCoord);
     outDiffuse.rgb *= toon * In.Diffuse.rgb * ToonLightColor + ToonAmbientColor * ao;
     outDiffuse.a *= In.Diffuse.a;
+
+    // Relief, applied on its own and deliberately not quantised: how much
+    // more (or less) the bumped normal faces the light than the flat surface
+    // under it. This is the part that actually shows as bumps.
+    float relief = dot(bumpedNormal, lv) - dot(geomNormal, lv);
+    outDiffuse.rgb *= saturate(1.0f + relief * BumpContrast * normalStrength);
 
     // Two octaves of drift across the field, so it stops reading as one
     // uniform green with a tile pattern in it.

@@ -62,6 +62,11 @@ void Polygon2D::Uninit()
     m_VertexLayout->Release();
     m_VertexShader->Release();
     m_PixelShader->Release();
+
+    // Without this the components are never uninited - a BGM hung off a
+    // Polygon2D keeps its source voice alive and plays on through the scene
+    // change. Every other GameObject in the project chains to the base.
+    GameObject::Uninit();
 }
 
 void Polygon2D::Update()

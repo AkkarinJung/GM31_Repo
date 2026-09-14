@@ -11,7 +11,14 @@
 void Title::Init()
 {
 
-	Manager::AddGameObj<Polygon2D>()->Init(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, L"asset\\bill_board\\tora.png");
+	Polygon2D* background = Manager::AddGameObj<Polygon2D>();
+	background->Init(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, L"asset\\bill_board\\tora.png");
+
+	// A Scene is not a GameObject, so the track rides on the background image.
+	// Both go away on the scene change, which is what stops it playing.
+	Audio* bgm = background->AddGameComponent<Audio>(background);
+	bgm->Load("asset\\Audio\\BGM\\TitleBGM.wav");
+	bgm->Play(true);
 
 }
 

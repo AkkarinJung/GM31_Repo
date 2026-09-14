@@ -216,9 +216,9 @@ void  MeshField::Draw()
     Renderer::SetMaterial(material);
 
     // Knobs for BumpPS: x = ramp row, y = AO strength, z = macro variation,
-    // w = normal map strength. The normal map is off: the texture is painted
-    // with its own shading and a second set of bumps on top fights it.
-    Renderer::SetParameter(XMFLOAT4(0.12f, 1.0f, 1.0f, 0.0f));
+    // w = normal map strength. Enough of the normal map to catch the light
+    // without fighting the shading already painted into the texture.
+    Renderer::SetParameter(XMFLOAT4(0.12f, 1.0f, 1.0f, 0.35f));
 
     ID3D11ShaderResourceView* textures[] =
     {
