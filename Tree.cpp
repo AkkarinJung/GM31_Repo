@@ -65,6 +65,8 @@ void Tree::Init()
 
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 20.0f ,20.0f ,20.0f });
+    // Not positioned here - Init runs inside AddGameObj, before the caller
+    // has had a chance to SetPosition this tree. Draw does it instead.
 }
 void Tree::Uninit()
 {
@@ -91,6 +93,14 @@ void Tree::HideShadow()
 }
 void  Tree::Update()
 {
+    GameObject::Update();
+}
+void  Tree::Draw()
+{
+    // Placed here rather than in Update, which does not run while the game is
+    // paused - see the note in Player::Draw. Shadow is layer 2 and a tree is
+    // layer 3, so the shadow uses last frame's position; a tree never moves,
+    // so that never shows.
     if (m_Shadow != nullptr)
     {
         Vector3 shadowPos = m_Position;
@@ -98,10 +108,6 @@ void  Tree::Update()
         m_Shadow->SetPosition(shadowPos);
     }
 
-    GameObject::Update();
-}
-void  Tree::Draw()
-{
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
 
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);

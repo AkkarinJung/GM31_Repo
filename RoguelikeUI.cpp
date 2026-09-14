@@ -32,6 +32,10 @@ static const float CARD_TOP = 210.0f;
 // name goes in there, everything else above it.
 static const float FOOTER_START = 0.70f;
 
+// How far the map behind the cards is dimmed. Named only so it is tunable -
+// 0.65 is the value this screen has always used.
+static const float DIM_STRENGTH = 0.65f;
+
 void RoguelikeUI::Init()
 {
     m_Layer = 4; // same UI layer as Score/HPBar/DamageNumber
@@ -288,7 +292,7 @@ void RoguelikeUI::Draw()
 
     // dim the map behind the cards
     DrawFlatQuad(0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT,
-        XMFLOAT4(0.0f, 0.0f, 0.0f, 0.65f));
+        XMFLOAT4(0.0f, 0.0f, 0.0f, DIM_STRENGTH));
 
     // title banner
     DrawSprite(BANNER, SCREEN_WIDTH * 0.5f - 300.0f, 110.0f, 600.0f, 58.0f, white);

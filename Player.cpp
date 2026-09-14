@@ -281,27 +281,54 @@ void Player::Update()
     }
 
     // The swing lands here, partway through the animation, not when the
-    // button went down.
-    if (m_Attacking && !m_AttackHitDone && m_AttackAnimLength > 0 &&
-        m_NextAnimationFrame >= (int)(m_AttackAnimLength * m_AttackHitPoint))
+    // button went down - and it stays dangerous for a few frames rather than
+    // for exactly one.
+    if (m_Attacking && m_AttackAnimLength > 0)
     {
-        m_AttackHitDone = true;
+        int windowOpen = (int)(m_AttackAnimLength * m_AttackHitPoint);
 
-        // Visual and hitbox are separate on purpose. The slash shows on
-        // every swing, hit or miss, and may reach further than the sword
-        // actually does - changing how it looks can never change what it
-        // damages.
-        SpawnSlash();
-
-        if (m_Weapon->Use(this))
+        // Latched on >=, exactly as the single frame version was, so nothing
+        // that moves the frame counter in jumps (hit stop, the 1/2/3 debug
+        // keys) can step over the window and produce a swing with no hitbox
+        // at all. Its length is then counted in frames of its own.
+        if (!m_AttackHitDone && m_NextAnimationFrame >= windowOpen)
         {
-            // Connected: hold the frame for a moment and kick the camera.
-            m_HitStopFrames = m_HitStopOnHit;
-            SoundEffect::Play(SE::SwordHit);
+            m_AttackHitDone = true;
 
-            Camera* camera = Manager::GetGameObj<Camera>();
-            if (camera != nullptr)
-                camera->Shake(GetFoward() * m_HitShake);
+            int windowClose = (int)(m_AttackAnimLength * m_AttackHitEnd);
+            m_AttackHitFrames = windowClose - windowOpen + 1;
+            if (m_AttackHitFrames < 1)
+                m_AttackHitFrames = 1;
+
+            // Visual and hitbox are separate on purpose. The slash shows on
+            // every swing, hit or miss, and may reach further than the sword
+            // actually does - changing how it looks can never change what it
+            // damages.
+            SpawnSlash();
+
+            m_Weapon->BeginSwing();
+        }
+
+        // Not while the impact freeze is holding: the animation is paused for
+        // those frames, so spending the window there would slide the hitbox
+        // out from under the pose it belongs to.
+        if (m_AttackHitFrames > 0 && m_HitStopFrames <= 0)
+        {
+            m_AttackHitFrames--;
+
+            // Use() reports true only for an enemy this swing has not already
+            // damaged, so the impact feedback fires once per enemy however
+            // long it stands in the arc.
+            if (m_Weapon->Use(this))
+            {
+                // Connected: hold the frame for a moment and kick the camera.
+                m_HitStopFrames = m_HitStopOnHit;
+                SoundEffect::Play(SE::SwordHit);
+
+                Camera* camera = Manager::GetGameObj<Camera>();
+                if (camera != nullptr)
+                    camera->Shake(GetFoward() * m_HitShake);
+            }
         }
     }
 
@@ -338,10 +365,6 @@ void Player::Update()
     // from trees/boxes/enemies (which resolve in X/Z) could otherwise
     // drift the player off Z=0 over time.
     m_Position.z = 0.0f;
-
-    Vector3 shadowPos = m_Position;
-    shadowPos.y = 0.01f;
-    m_Shadow->SetPosition(shadowPos);
 
     if (!m_Attacking)
     {
@@ -388,6 +411,16 @@ void Player::Update()
 
 void Player::Draw()
 {
+    // The shadow is placed here, not in Update. Update does not run while the
+    // game is paused, and the reward card screen pauses at the end of
+    // Game::Init - before any Update at all - which left every shadow in the
+    // map sitting on the world origin for the whole card screen. Draw always
+    // runs. Shadow is layer 2 and the player layer 1, so it is already
+    // positioned by the time it draws itself.
+    Vector3 shadowPos = m_Position;
+    shadowPos.y = 0.01f;
+    m_Shadow->SetPosition(shadowPos);
+
     // 入力レイアウト設定
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
 
@@ -772,6 +805,7 @@ void Player::StartAttack()
     // the hit window in Update(). Use() at this point hit the enemy while
     // the sword was still behind the player's back.
     m_AttackHitDone = false;
+    m_AttackHitFrames = 0;
     m_SpecialAttacking = false;
 
     // A step into the swing. Movement is locked while attacking, so the
@@ -817,6 +851,7 @@ void Player::StartRightAttack()
 void Player::StartCounterAttack()
 {
     m_AttackHitDone = false;
+    m_AttackHitFrames = 0;
     m_SpecialAttacking = true;
     m_ParryTimer = m_ParryTime; // the deflect is live from the first frame
     m_AttackQueued = false;     // a press buffered before this must not chain out of it

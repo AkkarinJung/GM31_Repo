@@ -70,12 +70,21 @@ void Manager::Update()
 				obj->Update();
 			}
 		}
-
-		m_GameObjects.remove_if([](GameObject* object)
-			{
-				return object->Destory();
-			});
 	}
+
+	// Outside the pause. Pausing stops things THINKING; it was never meant to
+	// keep dead objects alive, and leaving the reaper in there had a real
+	// consequence: Game::Init builds 150 trees, each of which creates a shadow
+	// in its own Init and is then told to drop it again (BuildTreeLine ->
+	// Tree::HideShadow), and the very last thing Init does is start the reward
+	// pick, which pauses. So 150 shadows sat marked-but-alive for the whole
+	// card screen, at the origin because nothing had positioned them, each one
+	// 40 units across - a huge black disc under the player that vanished the
+	// moment a card was picked and the reaper was allowed to run.
+	m_GameObjects.remove_if([](GameObject* object)
+		{
+			return object->Destory();
+		});
 
 	if (m_NextScene != nullptr)
 	{
@@ -132,11 +141,12 @@ void Manager::Draw()
 	for (int layer = 0; layer < 5; layer++)
 	{
 		for (GameObject* obj : m_GameObjects) {
+			if (obj == nullptr || obj->IsDestroyed())
+				continue; // marked this frame - do not show it one last time
+
 			if (obj->GetLayer() == layer)
 			{
-				if (obj != nullptr) {
-					obj->Draw();
-				}
+				obj->Draw();
 			}
 		}
 	}

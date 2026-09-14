@@ -141,6 +141,9 @@ void EnemyAI::Update()
     if (m_AttackCooldownTimer > 0.0f)
         m_AttackCooldownTimer -= DELTA_TIME;
 
+    if (m_StunImmunityTimer > 0.0f)
+        m_StunImmunityTimer -= DELTA_TIME;
+
     DecideState();
     Steer();
 }
@@ -417,9 +420,20 @@ bool EnemyAI::ConsumeAttack()
 
 void EnemyAI::OnDamaged()
 {
+    // Poise. The damage has already been applied by the caller - this is only
+    // about whether the enemy is allowed to STOP and react, and it is not
+    // allowed to do that on every hit of a combo. See StunImmunity.
+    if (m_StunImmunityTimer > 0.0f)
+        return;
+
+    m_StunImmunityTimer = m_Config.StunImmunity;
     Stun(m_Config.StunTime);
 }
 
+// A parry, and anything else that should stagger the enemy no matter what,
+// comes through here rather than through OnDamaged - it ignores the poise
+// timer on purpose. Reading a telegraph correctly is the one thing that is
+// always supposed to open the enemy up.
 void EnemyAI::Stun(float Time)
 {
     if (m_State == EnemyState::Dead)

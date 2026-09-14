@@ -13,7 +13,14 @@ void Explosion::Init()
 {
     m_Layer = 3;
 
-    m_Scale = { 0.5f, 0.5f, 0.5f };
+    // The quad below spans x -4..+4 and y 0..10, so this scale is what
+    // decides the burst's real size: 8 * scale wide, 10 * scale tall.
+    //
+    // It was 0.5 - a 4 x 5 unit burst standing over a 1.0 x 1.4 enemy, three
+    // and a half times the height of the thing that just died, which is why
+    // one kill filled the screen. 0.25 gives 2 x 2.5, a little bigger than
+    // the enemy and still clearly a pop.
+    m_Scale = { 0.25f, 0.25f, 0.25f };
 
     VERTEX_3D vertex[4];
 

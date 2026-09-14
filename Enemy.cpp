@@ -69,9 +69,21 @@ void Enemy::Update()
 {
     const float dt = 1.0f / 60.0f;
 
-    m_Position += m_Shake * cosf(m_ShakeTime * 100.0f);
+    // Hit wobble, decayed here and applied in Draw(). It is deliberately a
+    // one frame flip rather than a cosine: at 60fps a 100 rad/s cosine is
+    // sampled every 1.667 radians, which does not read as a vibration and
+    // does not average to zero either. Alternating the sign every frame is
+    // both, and it costs nothing.
+    m_ShakeOffset = m_Shake * ((m_ShakeFlip & 1) ? -1.0f : 1.0f);
+    m_ShakeFlip++;
+    m_Shake *= m_ShakeDecay;
+    if (m_Shake.lenght() < 0.001f)
+    {
+        m_Shake = Vector3(0.0f, 0.0f, 0.0f);
+        m_ShakeOffset = Vector3(0.0f, 0.0f, 0.0f);
+    }
+
     m_ShakeTime += dt;
-    m_Shake *= 0.9;
     if (m_ShakeTime > 0.04f)
     {
         m_Flash = false;
@@ -220,27 +232,41 @@ void Enemy::Update()
         Vector3 n;
         if (dist < 0.00001f)
         {
+            // Exactly on top of each other - pick a side. dist stays 0 so the
+            // penetration below is the full minimum distance; setting it to
+            // minDist (what this did before) made the penetration zero, which
+            // is the one case where two enemies could never separate at all.
             n = Vector3(1.0f, 0.0f, 0.0f);
-            dist = minDist;
+            dist = 0.0f;
         }
         else
         {
             n = delta * (1.0f / dist);
         }
 
-        // positional correction, weighted by mass - and an enemy mid swing
-        // counts as immovable, so its neighbours flow around it instead of
-        // jostling it off its target.
-        float penetration = minDist - dist;
+        // Positional correction, weighted by mass - an enemy mid swing is
+        // heavy, so its neighbours flow around it instead of jostling it off
+        // its target.
+        //
+        // Only a FRACTION of the overlap is resolved per frame and each side
+        // is clamped. Resolving all of it at once is what made enemies jump:
+        // a pair half a body apart snapped 1.4 units, a stacked pair 1.85,
+        // and with the attacker at mass 1000 the other one ate the whole
+        // correction on a single frame. The leftover is picked up next frame,
+        // so a crowd still untangles - it just does it where you can see it.
+        float penetration = (minDist - dist) * m_SeparationRelax;
 
-        float massA = m_AttackPending ? 1000.0f : m_Mass;
-        float massB = other->m_AttackPending ? 1000.0f : other->m_Mass;
+        float massA = m_AttackPending ? m_AttackingMass : m_Mass;
+        float massB = other->m_AttackPending ? other->m_AttackingMass : other->m_Mass;
 
         float totalMass = massA + massB;
         if (totalMass < 0.00001f) totalMass = 1.0f;
 
         float moveA = penetration * (massB / totalMass);
         float moveB = penetration * (massA / totalMass);
+
+        if (moveA > m_MaxSeparationStep) moveA = m_MaxSeparationStep;
+        if (moveB > other->m_MaxSeparationStep) moveB = other->m_MaxSeparationStep;
 
         m_Position += n * moveA;
         other->m_Position -= n * moveB;
@@ -275,7 +301,14 @@ void Enemy::Update()
             if (give > 1.0f) give = 1.0f;
             if (give < m_PushGiveMin) give = m_PushGiveMin;
 
-            m_Position += delta * ((m_PlayerSeparation - distance) * give);
+            // Clamped like the enemy-enemy push above, and for the same
+            // reason: walking into an enemy that is already pinned against a
+            // crate produced a large one-frame correction that read as a
+            // teleport rather than as being shouldered aside.
+            float step = (m_PlayerSeparation - distance) * give;
+            if (step > m_MaxSeparationStep) step = m_MaxSeparationStep;
+
+            m_Position += delta * step;
         }
     }
 
@@ -283,15 +316,18 @@ void Enemy::Update()
     if (!m_AI->IsFlying())
         Collision::PushOutOfSolids(m_Position, m_BodyHalfSize, solids);
 
-    Vector3 shadowPos = m_Position;
-    shadowPos.y = 0.01f;
-    m_Shadow->SetPosition(shadowPos);
-
     GameObject::Update();
 }
 
 void Enemy::Draw()
 {
+    // Placed here rather than in Update, which does not run while the game is
+    // paused - see the note in Player::Draw. Read off the true position, so
+    // the hit wobble applied further down never drags the shadow with it.
+    Vector3 shadowPos = m_Position;
+    shadowPos.y = 0.01f;
+    m_Shadow->SetPosition(shadowPos);
+
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
     Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
@@ -302,7 +338,16 @@ void Enemy::Draw()
     // Only the ramp has to be bound here.
     Renderer::GetDeviceContext()->PSSetShaderResources(1, 1, &m_RampTexture);
 
+    // The hit wobble goes on here and comes straight back off, so the world
+    // matrix shakes and m_Position does not. Everything that reads the
+    // enemy's position - the AI, the sword, the separation, the shadow -
+    // keeps seeing where the enemy actually is.
+    Vector3 truePosition = m_Position;
+    m_Position += m_ShakeOffset;
+
     GameObject::Draw();
+
+    m_Position = truePosition;
 }
 
 bool Enemy::CanReachTarget() const
@@ -342,6 +387,18 @@ void Enemy::AttackTarget()
     if (!CanReachTarget())
         return;
 
+    // Interrupted. The telegraph and the AI's state machine used to be
+    // completely independent: hitting an enemy 0.15s into its 0.525s wind-up
+    // put the AI into Stunned, but m_AttackWindup kept counting and the swing
+    // landed for full damage 0.37s later - while the enemy was still playing
+    // its hurt reaction. You read the tell, you answered it, and you got hit
+    // anyway with nothing on screen explaining why. AddDamage clears the
+    // pending swing now; this is the belt and braces for a stun from
+    // anywhere else (a parry, a future ability).
+    EnemyState state = m_AI->GetState();
+    if (state == EnemyState::Stunned || state == EnemyState::Dead)
+        return;
+
     // Parried: no damage, and the enemy is left open for far longer than a
     // normal hit stun.
     Player* player = dynamic_cast<Player*>(target);
@@ -372,6 +429,17 @@ void Enemy::AddDamage(int Damage, bool Critical)
 {
     m_Stats->TakeDamage(Damage);
     m_Flash = true;
+
+    // Taking a hit interrupts a swing that has not landed yet. OnDamaged()
+    // below only tells the AI, and the AI does not own the wind-up - so
+    // without this line the enemy flinched and then hit you anyway. Whether
+    // the flinch actually happens is the AI's call (it refuses to be stun
+    // locked, see EnemyAI::OnDamaged), but the swing is always cancelled:
+    // trading a hit for a hit you already interrupted is the single most
+    // unfair thing in the fight.
+    m_AttackPending = false;
+    m_AttackWindup = 0.0f;
+
     m_AI->OnDamaged();
 
     // The hurt grunt only for a hit it survives. On a killing blow the death
@@ -398,7 +466,12 @@ void Enemy::AddDamage(int Damage, bool Critical)
         SetDestory();
         Explosion* explosion = Manager::AddGameObj<Explosion>();
         explosion->SetPosition(m_Position);
-        this->SetScale(m_Scale * 2.0f);
+
+        // There used to be a "this->SetScale(m_Scale * 2.0f)" here. It scaled
+        // the ENEMY, not the explosion, and SetDestory() above means this
+        // object is deleted at the end of this same Update - before anything
+        // draws - so it never had any effect. The burst's size lives in
+        // Explosion::Init.
 
         Camera* camera = Manager::GetGameObj<Camera>();
         camera->Shake({ 1.0f,1.0f,0.0f });

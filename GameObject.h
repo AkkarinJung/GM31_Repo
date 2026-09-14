@@ -82,6 +82,12 @@ public:
 	}
 
 	void SetDestory() { m_Destroy = true; }
+
+	// Marked for destruction but not reaped yet. Draw skips these: an object
+	// can be marked during Init - before it has ever been positioned - and
+	// must not be shown in the frames before the reaper gets to it.
+	bool IsDestroyed() const { return m_Destroy; }
+
 	bool Destory() 
 	{
 		if (m_Destroy)

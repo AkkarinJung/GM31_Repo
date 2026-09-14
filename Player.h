@@ -66,8 +66,17 @@ private:
     // the animation. Damage used to land the instant the button went down,
     // with the sword still behind the player - this is what made the hits
     // feel disconnected from the animation.
+    //
+    // It is a WINDOW, not an instant. A single frame of hitbox is 16ms: an
+    // enemy that walks into the arc one frame late, or that is nudged out of
+    // it by the crowd on exactly that frame, eats nothing and the swing looks
+    // like it passed straight through. The weapon only lets a swing damage
+    // each enemy once (Weapon::m_HitThisSwing), so widening this cannot
+    // multi-hit - it only stops near misses of the clock.
     const float m_AttackHitPoint = 0.35f;
-    bool m_AttackHitDone = false;
+    const float m_AttackHitEnd = 0.55f;
+    bool m_AttackHitDone = false; // the window has OPENED (vfx + sound spent)
+    int m_AttackHitFrames = 0;    // frames of it left to run
 
     // How far into a swing the next one may start. Waiting for the full
     // animation (recovery included) is what made combos feel sluggish.

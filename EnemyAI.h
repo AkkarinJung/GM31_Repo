@@ -64,6 +64,18 @@ struct EnemyAIConfig
     float SeparationStrength = 0.0f;
 
     float StunTime = 0.3f;
+
+    // How long after a flinch this enemy refuses to flinch again. Damage
+    // always lands; the REACTION is what this gates.
+    //
+    // Without it a 3 hit combo (a hit roughly every 0.3s) re-applied a 0.3s
+    // stun on every hit, so an enemy in melee range was stun locked from the
+    // first hit until the player chose to stop. It could never answer, which
+    // is most of why a fight reads as hitting a training dummy. At 0.55 the
+    // enemy is free to act between roughly every other hit, so a combo is a
+    // trade rather than a lock.
+    float StunImmunity = 0.55f;
+
     bool  FaceTarget = true;     // false = face whichever way it is moving
 
     // Presets - the intended way to add a new enemy "type".
@@ -94,6 +106,7 @@ private:
     float m_PauseTimer = 0.0f;
     float m_AttackCooldownTimer = 0.0f;
     float m_StunTimer = 0.0f;
+    float m_StunImmunityTimer = 0.0f;
     float m_BobTime = 0.0f;
     float m_PatrolDirection = 1.0f;
 

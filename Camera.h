@@ -8,8 +8,9 @@ private:
 	XMMATRIX m_ViewMatrix;
 	XMMATRIX m_ProjectionMatrix;
 
-	Vector3 m_Shake;
-	float m_ShakeTime;
+	// Explicit, for the same reason as Enemy's - Vector3() initialises nothing.
+	Vector3 m_Shake{ 0.0f, 0.0f, 0.0f };
+	float m_ShakeTime = 0.0f;
 
 public:
 	void Init() override;

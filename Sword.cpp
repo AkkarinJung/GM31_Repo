@@ -25,11 +25,9 @@ void Sword::LoadModel()
 
 bool Sword::Use(GameObject* Owner)
 {
-    if (!CanUse())
-        return false;
-
-    m_CooldownTimer = m_Cooldown;
-
+    // No CanUse()/cooldown here any more - BeginSwing() owns both. This is
+    // called on every frame of the swing's active window, and a cooldown set
+    // on the first of those frames would reject all the rest.
     Vector3 ownerPos = Owner->GetPosition();
     Vector3 forward = Owner->GetFoward();
     forward.y = 0.0f;
@@ -43,16 +41,19 @@ bool Sword::Use(GameObject* Owner)
     float damage = m_Damage + (ownerStats != nullptr ? (float)ownerStats->GetAttack() : 0.0f);
     damage *= m_DamageMultiplier;
 
-    // Rolled once for the swing, not once per enemy, so a swing that hits two
-    // enemies crits on both or neither - one roll, one number colour.
-    bool critical = false;
-
-    float criticalChance = ownerStats != nullptr ? ownerStats->GetCriticalChance() : 0.0f;
-    if ((float)rand() / RAND_MAX < criticalChance)
+    // Rolled once for the swing, not once per enemy and not once per frame of
+    // the active window, so a swing that hits two enemies crits on both or
+    // neither - one roll, one number colour. BeginSwing() clears the flag.
+    if (!m_SwingRolled)
     {
-        damage *= m_CriticalDamage;
-        critical = true;
+        float criticalChance = ownerStats != nullptr ? ownerStats->GetCriticalChance() : 0.0f;
+        m_SwingCritical = ((float)rand() / RAND_MAX < criticalChance);
+        m_SwingRolled = true;
     }
+
+    bool critical = m_SwingCritical;
+    if (critical)
+        damage *= m_CriticalDamage;
 
     int attackPower = (int)(damage + 0.5f); // round, don't truncate
     if (attackPower < 1)
@@ -63,12 +64,48 @@ bool Sword::Use(GameObject* Owner)
     auto enemies = Manager::GetGameObjs<Enemy>();
     for (auto enemy : enemies)
     {
-        if (!Collision::SphereVsSphere(ownerPos, m_Range, enemy->GetPosition(), 0.0f))
+        // One hit per enemy per swing - the window is several frames long.
+        if (AlreadyHit(enemy))
             continue;
 
+        // 2.5D reach, matching how the enemy measures its own swing at the
+        // player (Enemy::CanReachTarget). The old test was
+        //     SphereVsSphere(ownerPos, m_Range, enemy->GetPosition(), 0.0f)
+        // which is one 3D distance from the player's FEET to the enemy's
+        // FEET, with the enemy given a radius of zero - a point on the floor.
+        // Two things fell out of that, and both of them read as the hit
+        // detection being broken:
+        //
+        //   * the enemy's body counted for nothing, so a swing that visibly
+        //     landed in its chest missed if its feet were 2.1 units away;
+        //
+        //   * height counted against the reach, so every swing taken in the
+        //     air missed. An enemy 1.5 across and 1.5 below is 2.12 away in
+        //     3D and was rejected, even though it is well inside the arc.
         Vector3 toEnemy = enemy->GetPosition() - ownerPos;
         toEnemy.y = 0.0f;
+
         float length = toEnemy.lenght();
+
+        // Horizontal reach, against the enemy's BODY rather than a point.
+        if (length > m_Range + enemy->GetHitRadius())
+            continue;
+
+        // Vertical reach, written the same way round as Enemy::CanReachTarget
+        // so the two are directly comparable. Positions are at the feet, so
+        // swinging down at something shorter than you costs nothing until you
+        // clear its head, while something above you is measured from your own
+        // feet.
+        float dy = ownerPos.y - enemy->GetPosition().y; // + = owner is above
+        float verticalGap = 0.0f;
+
+        if (dy > enemy->GetBodyHeight())
+            verticalGap = dy - enemy->GetBodyHeight();  // above the enemy's head
+        else if (dy < 0.0f)
+            verticalGap = -dy;                          // enemy is above the owner
+
+        if (verticalGap > m_VerticalReach)
+            continue;
 
         if (length <= 0.0f)
             continue;
@@ -77,6 +114,8 @@ bool Sword::Use(GameObject* Owner)
 
         if (Vector3::dot(forward, toEnemy) < m_AngleDot)
             continue;
+
+        MarkHit(enemy);
 
         enemy->AddDamage(attackPower, critical);
         enemy->Shake(forward * 0.5f);
