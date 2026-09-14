@@ -177,6 +177,9 @@
     <ClCompile Include="Particle.cpp">
       <Filter>Source Files\VisualEffect</Filter>
     </ClCompile>
+    <ClCompile Include="StatsUI.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -325,6 +328,9 @@
     </ClInclude>
     <ClInclude Include="SlashEffect.h">
       <Filter>Header Files\VisualEffect</Filter>
+    </ClInclude>
+    <ClInclude Include="StatsUI.h">
+      <Filter>Header Files\UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

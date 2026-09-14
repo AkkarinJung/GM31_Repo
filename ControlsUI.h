@@ -34,6 +34,9 @@ private:
     float DrawPrompt(const struct InputSprite& Sprite, float X, float Y, float Size);
 
 public:
+    bool IsOpen() const { return m_Open; }
+    void SetOpen(bool Open) { m_Open = Open; }
+
     void Init() override;
     void Uninit() override;
     void Update() override;

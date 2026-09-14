@@ -1,73 +1,52 @@
+#include <stdio.h>
+
 #include "main.h"
 #include "renderer.h"
+#include "StatsUI.h"
 #include "ControlsUI.h"
 #include "manager.h"
 #include "input.h"
 #include "Font.h"
-#include "StatsUI.h"
+#include "Player.h"
+#include "Stats.h"
+#include "Weapon.h"
+#include "Game.h"
+#include "RoguelikeSystem.h"
 
-// One prompt on asset\texture\Input\tilemap_packed.png: a 544x384 sheet of
-// 16x16 tiles, so a prompt is a column/row and how many tiles wide it is.
-struct InputSprite
-{
-    int Col, Row, Tiles;
-};
-
+// Prompts come off the same 544x384 sheet ControlsUI uses: 16x16 tiles, so a
+// prompt is a column, a row, and how many tiles wide it is.
 static const float INPUT_SHEET_WIDTH = 544.0f;
 static const float INPUT_SHEET_HEIGHT = 384.0f;
 static const float INPUT_TILE = 16.0f;
 
-static const InputSprite KEY_NONE  = { -1, 0, 0 };
-static const InputSprite KEY_A     = { 18, 3, 1 };
-static const InputSprite KEY_D     = { 20, 3, 1 };
-static const InputSprite KEY_SPACE = { 31, 6, 3 };
-static const InputSprite KEY_ESC   = { 17, 0, 1 };
-static const InputSprite KEY_TAB   = { 19, 5, 2 }; // 2 tiles wide
-static const InputSprite KEY_SHIFT = { 17, 7, 2 }; // 2 tiles wide
-static const InputSprite KEY_F1    = { 18, 0, 1 };
-static const InputSprite KEY_I     = { 24, 2, 1 }; // the sheet is a QWERTY layout
-static const InputSprite MOUSE_LEFT  = {  9, 2, 1 };
-static const InputSprite MOUSE_RIGHT = { 10, 2, 1 };
-
-// The binding list. This table is the whole panel - add a line here and the
-// row appears, no layout code to touch.
-struct ControlEntry
-{
-    InputSprite First;
-    InputSprite Second;
-    const char* Label;
-};
-
-static const ControlEntry s_Controls[] =
-{
-    { KEY_A,       KEY_D,     "Move left / right" },
-    { KEY_SPACE,   KEY_NONE,  "Jump" },
-    { MOUSE_LEFT,  KEY_NONE,  "Attack" },
-    { MOUSE_RIGHT, KEY_NONE,  "Special  -15 MP  parries" },
-    { KEY_I,       KEY_NONE,  "Stats" },
-    { KEY_F1,      KEY_NONE,  "Debug camera" },
-    { KEY_ESC,     KEY_NONE,  "Quit" },
-};
-
-static const int s_ControlCount = (int)(sizeof(s_Controls) / sizeof(s_Controls[0]));
+// The sheet is laid out as a QWERTY keyboard, so I sits in the top letter row.
+static const int KEY_I_COL = 24;
+static const int KEY_I_ROW = 2;
 
 // Panel layout, in screen pixels.
-static const float PROMPT_SIZE = 32.0f;  // 16px tiles drawn at 2x - an integer
-                                         // scale, which keeps the pixel art from
-                                         // smearing under the anisotropic sampler
-static const float ROW_HEIGHT = 46.0f;
-static const float PANEL_WIDTH = 500.0f;
-static const float LABEL_X = 150.0f;     // from the panel's left edge, so every
-                                         // label lines up whatever prompt it follows
+static const float PANEL_WIDTH = 520.0f;
+static const float ROW_HEIGHT = 38.0f;
+static const float LABEL_X = 40.0f;   // from the panel's left edge
+static const float VALUE_X = 330.0f;  // where the numbers line up
+static const float BAR_WIDTH = 150.0f;
+static const float BAR_HEIGHT = 12.0f;
 
-// The banner on the card sheet, reused as this panel's header.
+// The banner on the card sheet, the same header ControlsUI borrows.
 static const float BANNER_X = 64.0f, BANNER_Y = 827.0f, BANNER_W = 800.0f, BANNER_H = 77.0f;
 static const float CARD_SHEET_WIDTH = 1536.0f;
 static const float CARD_SHEET_HEIGHT = 1024.0f;
 
-void ControlsUI::Init()
+static const XMFLOAT4 COLOUR_WHITE = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+static const XMFLOAT4 COLOUR_LABEL = XMFLOAT4(0.72f, 0.76f, 0.85f, 1.0f);
+static const XMFLOAT4 COLOUR_VALUE = XMFLOAT4(1.0f, 0.96f, 0.80f, 1.0f);
+static const XMFLOAT4 COLOUR_HP = XMFLOAT4(0.85f, 0.25f, 0.30f, 1.0f);
+static const XMFLOAT4 COLOUR_MP = XMFLOAT4(0.30f, 0.55f, 0.90f, 1.0f);
+static const XMFLOAT4 COLOUR_REWARD = XMFLOAT4(0.60f, 0.90f, 0.65f, 1.0f);
+
+
+void StatsUI::Init()
 {
-    m_Layer = 4; // same UI layer as Score/HPBar/RoguelikeUI
+    m_Layer = 4; // same UI layer as Score / HPBar / ControlsUI
 
     VERTEX_3D vertex[4]{};
 
@@ -104,7 +83,7 @@ void ControlsUI::Init()
     assert(m_PanelTexture);
 }
 
-void ControlsUI::Uninit()
+void StatsUI::Uninit()
 {
     m_VertexBuffer->Release();
     m_VertexLayout->Release();
@@ -114,27 +93,25 @@ void ControlsUI::Uninit()
     m_PanelTexture->Release();
 }
 
-void ControlsUI::Update()
+void StatsUI::Update()
 {
-    // Not F1: Camera::Update uses that for its debug free-fly camera, so
-    // one press would open this panel and unhook the camera at once.
-    if (Input::GetKeyTrigger(VK_TAB))
+    if (Input::GetKeyTrigger('I'))
     {
         m_Open = !m_Open;
 
         // Both panels sit in the middle of the screen, so only one at a time.
         if (m_Open)
         {
-            StatsUI* stats = Manager::GetGameObj<StatsUI>();
-            if (stats)
-                stats->SetOpen(false);
+            ControlsUI* controls = Manager::GetGameObj<ControlsUI>();
+            if (controls)
+                controls->SetOpen(false);
         }
     }
 
     GameObject::Update();
 }
 
-void ControlsUI::BindPipeline()
+void StatsUI::BindPipeline()
 {
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
@@ -149,7 +126,7 @@ void ControlsUI::BindPipeline()
     Renderer::GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 }
 
-void ControlsUI::DrawFlatQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color)
+void StatsUI::DrawFlatQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color)
 {
     BindPipeline();
 
@@ -189,7 +166,7 @@ void ControlsUI::DrawFlatQuad(float X, float Y, float Width, float Height, const
     Renderer::GetDeviceContext()->Draw(4, 0);
 }
 
-void ControlsUI::DrawSprite(ID3D11ShaderResourceView* Texture, float SheetWidth, float SheetHeight,
+void StatsUI::DrawSprite(ID3D11ShaderResourceView* Texture, float SheetWidth, float SheetHeight,
     float SourceX, float SourceY, float SourceWidth, float SourceHeight,
     float X, float Y, float Width, float Height)
 {
@@ -239,45 +216,67 @@ void ControlsUI::DrawSprite(ID3D11ShaderResourceView* Texture, float SheetWidth,
     Renderer::GetDeviceContext()->Draw(4, 0);
 }
 
-float ControlsUI::DrawPrompt(const InputSprite& Sprite, float X, float Y, float Size)
+float StatsUI::DrawStatRow(float PanelX, float Y, const char* Label, const char* Value)
 {
-    if (Sprite.Col < 0)
-        return X;
+    Font::Draw(Label, PanelX + LABEL_X, Y, 22.0f, COLOUR_LABEL);
+    Font::Draw(Value, PanelX + VALUE_X, Y, 22.0f, COLOUR_VALUE);
 
-    // wide keys (the space bar is 3 tiles) keep their shape
-    float width = Size * Sprite.Tiles;
-
-    DrawSprite(m_InputTexture, INPUT_SHEET_WIDTH, INPUT_SHEET_HEIGHT,
-        Sprite.Col * INPUT_TILE, Sprite.Row * INPUT_TILE,
-        Sprite.Tiles * INPUT_TILE, INPUT_TILE,
-        X, Y, width, Size);
-
-    return X + width + 6.0f;
+    return Y + ROW_HEIGHT;
 }
 
-void ControlsUI::Draw()
+float StatsUI::DrawBarRow(float PanelX, float Y, const char* Label, const char* Value,
+    float Fraction, const XMFLOAT4& Color)
 {
-    // While something else has paused the game (the start of map reward
-    // pick) the panel would just sit on top of it - stay out of the way.
+    Font::Draw(Label, PanelX + LABEL_X, Y, 22.0f, COLOUR_LABEL);
+    Font::Draw(Value, PanelX + VALUE_X, Y, 22.0f, COLOUR_VALUE);
+
+    if (Fraction < 0.0f) Fraction = 0.0f;
+    if (Fraction > 1.0f) Fraction = 1.0f;
+
+    // Bar under the text, so a glance reads the ratio without the numbers.
+    float barX = PanelX + LABEL_X;
+    float barY = Y + 26.0f;
+
+    DrawFlatQuad(barX, barY, BAR_WIDTH, BAR_HEIGHT, XMFLOAT4(0.18f, 0.18f, 0.22f, 1.0f));
+    DrawFlatQuad(barX, barY, BAR_WIDTH * Fraction, BAR_HEIGHT, Color);
+
+    return Y + ROW_HEIGHT + 14.0f;
+}
+
+void StatsUI::Draw()
+{
+    // While the reward cards are up the game is paused and they own the
+    // screen - stay out of the way, the same as ControlsUI does.
     if (Manager::IsPause())
         return;
 
-    const XMFLOAT4 white = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    const XMFLOAT4 label = XMFLOAT4(0.85f, 0.88f, 0.95f, 1.0f);
-
     if (!m_Open)
     {
-        // closed - just the hint, so the panel is discoverable
+        // closed - just the hint, so the panel is discoverable. Sits above
+        // the CONTROLS hint in the same corner.
         float hintX = 24.0f;
-        float hintY = SCREEN_HEIGHT - 48.0f;
+        float hintY = SCREEN_HEIGHT - 84.0f;
 
-        DrawPrompt(KEY_TAB, hintX, hintY, 28.0f);
-        Font::Draw("CONTROLS", hintX + 66.0f, hintY + 4.0f, 20.0f,
+        DrawSprite(m_InputTexture, INPUT_SHEET_WIDTH, INPUT_SHEET_HEIGHT,
+            KEY_I_COL * INPUT_TILE, KEY_I_ROW * INPUT_TILE, INPUT_TILE, INPUT_TILE,
+            hintX, hintY, 28.0f, 28.0f);
+
+        Font::Draw("STATS", hintX + 66.0f, hintY + 4.0f, 20.0f,
             XMFLOAT4(1.0f, 1.0f, 1.0f, 0.75f));
         return;
     }
 
-    float panelHeight = 110.0f + s_ControlCount * ROW_HEIGHT;
+    Player* player = Manager::GetGameObj<Player>();
+    Stats* stats = player ? player->GetGameComponent<Stats>() : nullptr;
+    Weapon* weapon = player ? player->GetWeapon() : nullptr;
+
+    const std::vector<RoguelikeReward>& taken = RoguelikeSystem::GetTaken();
+    int rewardCount = (int)taken.size();
+
+    // Seven stat rows, two of which carry a bar, then the rewards.
+    float panelHeight = 150.0f + 7.0f * ROW_HEIGHT + 2.0f * 14.0f
+        + (rewardCount > 0 ? (34.0f + rewardCount * 26.0f) : 0.0f);
+
     float panelX = (SCREEN_WIDTH - PANEL_WIDTH) * 0.5f;
     float panelY = (SCREEN_HEIGHT - panelHeight) * 0.5f;
 
@@ -287,8 +286,7 @@ void ControlsUI::Draw()
     DrawFlatQuad(panelX, panelY, PANEL_WIDTH, panelHeight,
         XMFLOAT4(0.10f, 0.10f, 0.14f, 0.95f));
 
-    // header banner, borrowed from the card sheet so both menus match.
-    // 800x77 art, so the height follows the width to keep its shape.
+    // header banner, the same one the controls panel uses so both match.
     float bannerWidth = PANEL_WIDTH - 60.0f;
     float bannerHeight = bannerWidth * (BANNER_H / BANNER_W);
 
@@ -296,24 +294,66 @@ void ControlsUI::Draw()
         BANNER_X, BANNER_Y, BANNER_W, BANNER_H,
         panelX + 30.0f, panelY - bannerHeight * 0.5f, bannerWidth, bannerHeight);
 
-    Font::DrawCentered("CONTROLS", panelX + PANEL_WIDTH * 0.5f, panelY - 12.0f, 24.0f, white);
+    Font::DrawCentered("STATS", panelX + PANEL_WIDTH * 0.5f, panelY - 12.0f, 24.0f, COLOUR_WHITE);
 
-    float rowY = panelY + 70.0f;
+    char value[64];
+    float rowY = panelY + 60.0f;
 
-    for (int i = 0; i < s_ControlCount; i++)
+    snprintf(value, sizeof(value), "%d", Game::GetStageIndex() + 1);
+    rowY = DrawStatRow(panelX, rowY, "STAGE", value);
+
+    if (stats)
     {
-        const ControlEntry& entry = s_Controls[i];
+        snprintf(value, sizeof(value), "%d / %d", stats->GetHP(), stats->GetMaxHP());
+        rowY = DrawBarRow(panelX, rowY, "HP", value,
+            stats->GetMaxHP() > 0 ? (float)stats->GetHP() / stats->GetMaxHP() : 0.0f,
+            COLOUR_HP);
 
-        float promptX = panelX + 40.0f;
-        promptX = DrawPrompt(entry.First, promptX, rowY, PROMPT_SIZE);
-        DrawPrompt(entry.Second, promptX, rowY, PROMPT_SIZE);
+        snprintf(value, sizeof(value), "%d / %d", stats->GetMP(), stats->GetMaxMP());
+        rowY = DrawBarRow(panelX, rowY, "MP", value,
+            stats->GetMaxMP() > 0 ? (float)stats->GetMP() / stats->GetMaxMP() : 0.0f,
+            COLOUR_MP);
 
-        Font::Draw(entry.Label, panelX + LABEL_X, rowY + 5.0f, 22.0f, label);
+        snprintf(value, sizeof(value), "%d", stats->GetAttack());
+        rowY = DrawStatRow(panelX, rowY, "ATTACK", value);
 
-        rowY += ROW_HEIGHT;
+        snprintf(value, sizeof(value), "%d", stats->GetDefense());
+        rowY = DrawStatRow(panelX, rowY, "DEFENSE", value);
+
+        snprintf(value, sizeof(value), "%d%%", (int)(stats->GetCriticalChance() * 100.0f + 0.5f));
+        rowY = DrawStatRow(panelX, rowY, "CRITICAL", value);
+    }
+    else
+    {
+        rowY = DrawStatRow(panelX, rowY, "HP", "-");
     }
 
-    DrawPrompt(KEY_TAB, panelX + 40.0f, panelY + panelHeight - 42.0f, 26.0f);
+    if (weapon)
+    {
+        snprintf(value, sizeof(value), "%.0f", weapon->GetDamage() * weapon->GetDamageMultiplier());
+        rowY = DrawStatRow(panelX, rowY, "WEAPON DAMAGE", value);
+
+        snprintf(value, sizeof(value), "%.1f", weapon->GetRange());
+        rowY = DrawStatRow(panelX, rowY, "WEAPON RANGE", value);
+    }
+
+    if (rewardCount > 0)
+    {
+        rowY += 8.0f;
+        Font::Draw("RUN REWARDS", panelX + LABEL_X, rowY, 20.0f, COLOUR_WHITE);
+        rowY += 26.0f;
+
+        for (int i = 0; i < rewardCount; i++)
+        {
+            Font::Draw(taken[i].Name, panelX + LABEL_X + 14.0f, rowY, 19.0f, COLOUR_REWARD);
+            rowY += 26.0f;
+        }
+    }
+
+    DrawSprite(m_InputTexture, INPUT_SHEET_WIDTH, INPUT_SHEET_HEIGHT,
+        KEY_I_COL * INPUT_TILE, KEY_I_ROW * INPUT_TILE, INPUT_TILE, INPUT_TILE,
+        panelX + 40.0f, panelY + panelHeight - 42.0f, 26.0f, 26.0f);
+
     Font::Draw("CLOSE", panelX + 100.0f, panelY + panelHeight - 38.0f, 20.0f,
         XMFLOAT4(0.65f, 0.68f, 0.75f, 1.0f));
 }

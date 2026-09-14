@@ -48,6 +48,11 @@ private:
 	// still be placed the way its FBX node says (see Load).
 	std::vector<aiMatrix4x4> m_MeshTransform;
 
+	// Model space extents, so an owner can see how big what it loaded really
+	// is instead of assuming the artist matched the engine's conventions.
+	XMFLOAT3 m_BoundsMin{ 0.0f, 0.0f, 0.0f };
+	XMFLOAT3 m_BoundsMax{ 0.0f, 0.0f, 0.0f };
+
 	void CreateBone(aiNode* Node);
 	void CollectMeshTransforms(aiNode* Node, const aiMatrix4x4& ParentMatrix);
 	void UpdateBoneMatrix(aiNode* Node, aiMatrix4x4 Matrix);
@@ -56,6 +61,9 @@ public:
 	using Component::Component;
 
 	void Load( const char *FileName );
+
+	XMFLOAT3 GetBoundsMin() const { return m_BoundsMin; }
+	XMFLOAT3 GetBoundsMax() const { return m_BoundsMax; }
 	void LoadAnimation( const char *FileName, const char *Name );
 	void Uninit() override;
 	void Update(const char* AnimationName1, int Frame1,

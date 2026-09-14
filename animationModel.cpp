@@ -80,6 +80,8 @@
 		m_MeshTransform.assign(m_AiScene->mNumMeshes, aiMatrix4x4());
 		CollectMeshTransforms(m_AiScene->mRootNode, aiMatrix4x4());
 
+		bool boundsSet = false;
+
 
 
 		for (unsigned int m = 0; m < m_AiScene->mNumMeshes; m++)
@@ -109,6 +111,24 @@
 					normal.Normalize();
 
 					vertex[v].Position = XMFLOAT3(position.x, position.y, position.z);
+
+					// Track the extents while the vertices are already in hand.
+					if (!boundsSet)
+					{
+						m_BoundsMin = vertex[v].Position;
+						m_BoundsMax = vertex[v].Position;
+						boundsSet = true;
+					}
+					else
+					{
+						m_BoundsMin.x = std::min(m_BoundsMin.x, position.x);
+						m_BoundsMin.y = std::min(m_BoundsMin.y, position.y);
+						m_BoundsMin.z = std::min(m_BoundsMin.z, position.z);
+
+						m_BoundsMax.x = std::max(m_BoundsMax.x, position.x);
+						m_BoundsMax.y = std::max(m_BoundsMax.y, position.y);
+						m_BoundsMax.z = std::max(m_BoundsMax.z, position.z);
+					}
 					vertex[v].Normal = XMFLOAT3(normal.x, normal.y, normal.z);
 					vertex[v].TexCoord = XMFLOAT2(mesh->mTextureCoords[0][v].x, mesh->mTextureCoords[0][v].y);
 					vertex[v].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);

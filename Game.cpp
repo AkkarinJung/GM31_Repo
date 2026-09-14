@@ -25,6 +25,7 @@
 
 #include "HPBar.h"
 #include "ControlsUI.h"
+#include "StatsUI.h"
 
 #include "StageUI.h"
 #include "EnemyHPBar.h"
@@ -141,6 +142,7 @@ void Game::Init()
 	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, BarStat::HP, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
 	Manager::AddGameObj<HPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, BarStat::MP, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
 	Manager::AddGameObj<ControlsUI>();
+	Manager::AddGameObj<StatsUI>();
 	Manager::AddGameObj<StageUI>();
 	Manager::AddGameObj<EnemyHPBar>();
 

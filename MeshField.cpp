@@ -173,7 +173,7 @@ void MeshField::Init()
 
     //BGM
     Audio* bgm = AddGameComponent<Audio>(this);
-    bgm->Load("asset\\Audio\\bgm.wav");
+    bgm->Load("asset\\Audio\\BGM\\GameBGM.wav");
     bgm->Play(true);
 
 }

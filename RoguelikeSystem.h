@@ -56,4 +56,7 @@ public:
     // Clear the run's rewards. Call when a new run starts (Game::ResetProgress
     // does), never between stages.
     static void ResetRun() { s_Taken.clear(); }
+    // Everything taken so far this run, for StatsUI to list. Read only - the
+    // pick itself stays entirely in here.
+    static const std::vector<RoguelikeReward>& GetTaken() { return s_Taken; }
 };
