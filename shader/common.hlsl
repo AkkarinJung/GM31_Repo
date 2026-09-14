@@ -86,3 +86,14 @@ struct TOON_PS_IN
     float2 TexCoord : TEXCOORD0;
     float4 WorldPosition : TEXCOORD1;
 };
+
+struct BUMP_PS_IN
+{
+    float4 Position : SV_POSITION;
+    float4 Normal : NORMAL0;
+    float4 Tangent : TANGENT0;
+    float4 Binormal : BINORMAL0;
+    float4 Diffuse : COLOR0;
+    float2 TexCoord : TEXCOORD0;
+    float4 WorldPosition : TEXCOORD1;
+};

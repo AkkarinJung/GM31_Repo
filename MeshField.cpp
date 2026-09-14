@@ -28,6 +28,17 @@ float g_FieldHeight[21][21] =
 
 };
 
+// The grass material is a whole set of maps, so keep the loading in one place.
+static void LoadTexture(const wchar_t* FileName, ID3D11ShaderResourceView** Texture)
+{
+    TexMetadata metadata;
+    ScratchImage image;
+    LoadFromWICFile(FileName, WIC_FLAGS_NONE, &metadata, image);
+    CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+        image.GetImageCount(), metadata, Texture);
+    assert(*Texture);
+}
+
 void MeshField::Init()
 {
     m_Layer = 1;
@@ -122,17 +133,17 @@ void MeshField::Init()
  
     // シェーダー読込
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout,
-        "shader\\FieldVS.cso");
+        "shader\\BumpVS.cso");
 
     Renderer::CreatePixelShader(&m_PixelShader,
-        "shader\\FieldPS.cso");
+        "shader\\BumpPS.cso");
 
-    TexMetadata metadata;
-    ScratchImage image;
-    LoadFromWICFile(L"asset\\texture\\Brick.jpg", WIC_FLAGS_NONE, &metadata, image);
-    CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
-        image.GetImageCount(), metadata, &m_Texture);
-    assert(m_Texture);
+    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_albedo.png", &m_Texture);
+    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_normal-ogl.png", &m_TextureNormal);
+    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_height.png", &m_TextureHeight);
+    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_roughness.png", &m_TextureRoughness);
+    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_ao.png", &m_TextureAO);
+    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_metallic.png", &m_TextureMetallic);
 
     //BGM
     Audio* bgm = AddGameComponent<Audio>(this);
@@ -149,6 +160,13 @@ void MeshField::Uninit()
     m_VertexLayout->Release();
     m_VertexShader->Release();
     m_PixelShader->Release();
+
+    m_Texture->Release();
+    m_TextureNormal->Release();
+    m_TextureHeight->Release();
+    m_TextureRoughness->Release();
+    m_TextureAO->Release();
+    m_TextureMetallic->Release();
 
     GameObject::Uninit();
 }
@@ -170,7 +188,18 @@ void  MeshField::Draw()
     material.TextureEnable = true;
     Renderer::SetMaterial(material);
 
-    Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &m_Texture);
+    Renderer::SetParameter(XMFLOAT4(0.03f, 1.0f, 0.15f, 1.0f));
+
+    ID3D11ShaderResourceView* textures[] =
+    {
+        m_Texture,          // t0 albedo
+        m_TextureNormal,    // t1 normal
+        m_TextureHeight,    // t2 height
+        m_TextureRoughness, // t3 roughness
+        m_TextureAO,        // t4 ambient occlusion
+        m_TextureMetallic,  // t5 metallic
+    };
+    Renderer::GetDeviceContext()->PSSetShaderResources(0, ARRAYSIZE(textures), textures);
 
     UINT stride = sizeof(VERTEX_3D);
     UINT offset = 0;

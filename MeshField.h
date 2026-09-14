@@ -16,6 +16,11 @@ private:
 	ID3D11PixelShader* m_PixelShader;
 
 	ID3D11ShaderResourceView* m_Texture;
+	ID3D11ShaderResourceView* m_TextureNormal;
+	ID3D11ShaderResourceView* m_TextureHeight;
+	ID3D11ShaderResourceView* m_TextureRoughness;
+	ID3D11ShaderResourceView* m_TextureAO;
+	ID3D11ShaderResourceView* m_TextureMetallic;
 
 	VERTEX_3D m_Vertex[21][21];
 

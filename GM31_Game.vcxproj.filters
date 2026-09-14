@@ -351,6 +351,12 @@
     </FxCompile>
     <FxCompile Include="shader\toonPS.hlsl" />
     <FxCompile Include="shader\toonVS.hlsl" />
+    <FxCompile Include="shader\BumpPS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\BumpVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DirectXTex\DirectXTex.inl">

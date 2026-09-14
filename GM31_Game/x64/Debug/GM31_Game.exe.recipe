@@ -7,6 +7,12 @@
   </ProjectOutputs>
   <ContentFiles>
     <ContentFile>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\BumpPS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\BumpVS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\pro19\Desktop\GM31_Repo\shader\FieldPS.cso</FullPath>
     </ContentFile>
     <ContentFile>

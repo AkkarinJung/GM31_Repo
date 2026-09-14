@@ -21,7 +21,6 @@ C:\Users\pro19\Desktop\GM31_Repo\main.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_
 C:\Users\pro19\Desktop\GM31_Repo\manager.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\manager.obj
 C:\Users\pro19\Desktop\GM31_Repo\MeshField.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\MeshField.obj
 C:\Users\pro19\Desktop\GM31_Repo\modelRenderer.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\modelRenderer.obj
-C:\Users\pro19\Desktop\GM31_Repo\MPBar.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\MPBar.obj
 C:\Users\pro19\Desktop\GM31_Repo\Particle.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Particle.obj
 C:\Users\pro19\Desktop\GM31_Repo\Player.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Player.obj
 C:\Users\pro19\Desktop\GM31_Repo\Polygon2D.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Polygon2D.obj
@@ -33,6 +32,8 @@ C:\Users\pro19\Desktop\GM31_Repo\Scene.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31
 C:\Users\pro19\Desktop\GM31_Repo\Score.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Score.obj
 C:\Users\pro19\Desktop\GM31_Repo\Shadow.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Shadow.obj
 C:\Users\pro19\Desktop\GM31_Repo\SkyDome.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\SkyDome.obj
+C:\Users\pro19\Desktop\GM31_Repo\SlashEffect.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\SlashEffect.obj
+C:\Users\pro19\Desktop\GM31_Repo\SoundEffect.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\SoundEffect.obj
 C:\Users\pro19\Desktop\GM31_Repo\Stage.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Stage.obj
 C:\Users\pro19\Desktop\GM31_Repo\StageUI.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\StageUI.obj
 C:\Users\pro19\Desktop\GM31_Repo\Sword.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Sword.obj
