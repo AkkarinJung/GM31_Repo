@@ -25,7 +25,6 @@ private:
     // follows cannot disagree - they did, and the mismatch burned a whole
     // attack state and cooldown on a swing that was then rejected.
     const float m_AttackSlack = 0.15f;  // grace for the player edging away during the telegraph
-    const float m_TargetHeight = 1.8f;  // how tall the thing it swings at is
 
     void AttackTarget();
 

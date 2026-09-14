@@ -69,6 +69,13 @@ void Enemy::Update()
 {
     const float dt = 1.0f / 60.0f;
 
+    // Think first, then act. This runs the components - EnemyAI among them -
+    // and it used to sit at the BOTTOM of this function, so everything below
+    // was acting on the decision the AI made a frame ago. At a chase speed of
+    // 3 units/s that is 5cm of stale aim every frame, and it showed up as the
+    // enemy consistently swinging at where the player just was.
+    GameObject::Update();
+
     // Hit wobble, decayed here and applied in Draw(). It is deliberately a
     // one frame flip rather than a cosine: at 60fps a 100 rad/s cosine is
     // sampled every 1.667 radians, which does not read as a vibration and
@@ -194,7 +201,11 @@ void Enemy::Update()
     while (deltaYaw > XM_PI)  deltaYaw -= XM_2PI;
     while (deltaYaw < -XM_PI) deltaYaw += XM_2PI;
 
-    const float turnSpeed = 4.0f;
+    // Fast enough that the body is pointing the right way by the time the AI
+    // is willing to swing (EnemyAI::FacingTarget gates on the AI's facing, and
+    // at 4 rad/s a half turn took 0.79s - long enough to start a swing while
+    // still visibly pointing the other way).
+    const float turnSpeed = 10.0f;
     float maxStep = turnSpeed * dt;
     if (deltaYaw > maxStep) deltaYaw = maxStep;
     if (deltaYaw < -maxStep) deltaYaw = -maxStep;
@@ -315,8 +326,6 @@ void Enemy::Update()
     // The separations above are soft pushes; crates still win.
     if (!m_AI->IsFlying())
         Collision::PushOutOfSolids(m_Position, m_BodyHalfSize, solids);
-
-    GameObject::Update();
 }
 
 void Enemy::Draw()
@@ -365,11 +374,15 @@ bool Enemy::CanReachTarget() const
     // Vertical reach. Positions are at the feet, so an enemy hovering above
     // the target still connects with its head, while one on the ground
     // cannot reach a target standing on a crate over it.
+    // Height comes off the AI config, so this test and the one the AI used to
+    // decide to attack are the same test.
+    float targetHeight = m_AI->GetAttackTargetHeight();
+
     float dy = m_Position.y - target->GetPosition().y;
     float verticalGap = 0.0f;
 
-    if (dy > m_TargetHeight)
-        verticalGap = dy - m_TargetHeight;  // above the target's head
+    if (dy > targetHeight)
+        verticalGap = dy - targetHeight;    // above the target's head
     else if (dy < 0.0f)
         verticalGap = -dy;                  // target is above this enemy
 

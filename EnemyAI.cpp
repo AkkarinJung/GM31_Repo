@@ -8,6 +8,7 @@
 #include "manager.h"
 #include "Player.h"
 #include "MeshField.h"
+#include "Collision.h"
 
 namespace
 {
@@ -16,6 +17,21 @@ namespace
 }
 
 std::vector<EnemyAI*> EnemyAI::s_Instances;
+EnemyAI* EnemyAI::s_AttackToken = nullptr;
+float EnemyAI::s_TokenCooldown = 0.0f;
+
+namespace
+{
+    // The beat between one enemy finishing its swing and the next being
+    // allowed to start. Without a gap the token just hands straight on and a
+    // crowd still produces an unbroken stream of attacks.
+    const float TOKEN_HANDOVER_GAP = 0.45f;
+
+    float Random01()
+    {
+        return (float)rand() / (float)RAND_MAX;
+    }
+}
 
 EnemyAIConfig EnemyAIConfig::Patroller()
 {
@@ -41,6 +57,10 @@ EnemyAIConfig EnemyAIConfig::Patroller()
     // not enough to go looking.
     config.DetectRange = 2.0f;
     config.LoseRange = 3.0f;
+
+    // It barely looks up from its beat, so give it a narrow cone. Being hit
+    // still turns it round - see EnemyAI::Alert.
+    config.VisionHalfAngle = 0.9f;
     return config;
 }
 
@@ -64,6 +84,10 @@ EnemyAIConfig EnemyAIConfig::Walker()
     config.FaceTarget = true;
     config.SeparationRadius = 1.4f;
     config.SeparationStrength = 1.0f;
+
+    // The fighter of the three: a wide cone and the full crowd behaviour.
+    config.VisionHalfAngle = 1.15f;   // ~66 degrees each side
+    config.NeedsAttackToken = true;
     return config;
 }
 
@@ -77,6 +101,11 @@ EnemyAIConfig EnemyAIConfig::Turret()
     config.AttackDuration = 0.75f;
     config.DetectRange = 2.0f;
     config.LoseRange = 3.0f;
+
+    // It cannot move, so it can never be "blocked" and must never give up -
+    // and a thing that only guards its own spot gets to watch all round it.
+    config.VisionHalfAngle = 3.15f;       // effectively 360
+    config.BlockedGiveUpTime = 99999.0f;
     return config;
 }
 
@@ -99,16 +128,34 @@ EnemyAIConfig EnemyAIConfig::Flyer()
     config.BobSpeed = 2.5f;
     config.SeparationRadius = 1.6f;
     config.SeparationStrength = 1.2f;
+
+    // It flies over the crates, so nothing on the ground can block it and it
+    // has the height to see past most of the scenery.
+    config.VisionHalfAngle = 1.3f;
+    config.RequireLineOfSight = false;
+    config.BlockedGiveUpTime = 99999.0f;
+    config.EyeHeight = 0.0f;   // it already hovers well above the ground
     return config;
 }
 
 void EnemyAI::Init()
 {
     s_Instances.push_back(this);
+
+    // Rolled once, here, so this enemy keeps its own reaction for its whole
+    // life - re-rolling every time it spots something would average out and
+    // the group would sync up again.
+    m_ReactionTime = m_Config.ReactionMin +
+        (m_Config.ReactionMax - m_Config.ReactionMin) * Random01();
+    m_ReactionTimer = m_ReactionTime;
 }
 
 void EnemyAI::Uninit()
 {
+    // Never leave the token held by a dead enemy - nothing else would ever be
+    // allowed to attack again.
+    ReleaseAttackToken();
+
     for (size_t i = 0; i < s_Instances.size(); i++)
     {
         if (s_Instances[i] == this)
@@ -130,6 +177,13 @@ void EnemyAI::Update()
         m_HomeCaptured = true;
     }
 
+    // Ticked before the Dead check, and by exactly one instance: the token gap
+    // is global, and if the enemy that happens to be first in the list is the
+    // one that just died, an early return here would freeze the gap and stall
+    // every other enemy's turn to attack.
+    if (!s_Instances.empty() && s_Instances[0] == this && s_TokenCooldown > 0.0f)
+        s_TokenCooldown -= DELTA_TIME;
+
     if (m_State == EnemyState::Dead)
         return;
 
@@ -143,6 +197,39 @@ void EnemyAI::Update()
 
     if (m_StunImmunityTimer > 0.0f)
         m_StunImmunityTimer -= DELTA_TIME;
+
+    if (m_DisengageTimer > 0.0f)
+        m_DisengageTimer -= DELTA_TIME;
+
+    // Am I getting anywhere? This compares what was ASKED for last frame with
+    // what the body actually did, which is the only way the AI can find out
+    // that a crate is in the way - it does no collision of its own. A grounded
+    // enemy cannot climb, so a chase that stops making progress is a chase
+    // that is never going to end.
+    float x = m_GameObject->GetPosition().x;
+    bool pushing = (m_State == EnemyState::Chase) &&
+        (m_MoveSpeed > 0.0f) && (fabsf(m_MoveDirection.x) > 0.01f);
+
+    if (pushing && fabsf(x - m_LastX) < 0.005f)
+    {
+        m_BlockedTimer += DELTA_TIME;
+
+        if (m_BlockedTimer >= m_Config.BlockedGiveUpTime)
+        {
+            m_BlockedTimer = 0.0f;
+            m_DisengageTimer = m_Config.DisengageTime;
+            m_Aware = false;
+            m_Alerted = false;
+            m_ReactionTimer = m_ReactionTime;
+            ReleaseAttackToken();
+        }
+    }
+    else
+    {
+        m_BlockedTimer = 0.0f;
+    }
+
+    m_LastX = x;
 
     DecideState();
     Steer();
@@ -173,29 +260,57 @@ void EnemyAI::DecideState()
         if (m_StateTime < m_Config.AttackDuration)
             return; // let the swing finish before reconsidering
 
+        ReleaseAttackToken(); // its turn is over - let the next one in
         SetState(EnemyState::Idle);
     }
 
     float distance = HorizontalDistanceToTarget();
-    bool detected = TargetDetected(distance);
+    bool sensed = TargetDetected(distance);
 
-    // Vertical gap as well as horizontal. Deciding on horizontal distance
-    // alone meant an enemy committed to a swing it could not reach, spending
-    // its whole attack state and cooldown standing frozen with nothing to
-    // show for it.
-    float verticalGap = (m_Target != nullptr)
-        ? fabsf(m_Target->GetPosition().y - m_GameObject->GetPosition().y)
-        : 0.0f;
+    // Reaction. Sensing the player is not the same as having reacted to them:
+    // the enemy has to have held the contact for its own roll of a fraction of
+    // a second before it may act on it. Everything downstream uses "detected",
+    // so a fresh contact cannot chase or swing during that window.
+    if (sensed)
+    {
+        if (!m_Aware)
+        {
+            m_ReactionTimer -= DELTA_TIME;
+            if (m_ReactionTimer <= 0.0f)
+                m_Aware = true;
+        }
+    }
+    else
+    {
+        m_Aware = false;
+        m_Alerted = false;
+        m_ReactionTimer = m_ReactionTime;
+        ReleaseAttackToken(); // lost them - do not sit on the token
+    }
+
+    bool detected = sensed && m_Aware;
+
+    // Vertical gap measured exactly the way the swing measures it - see
+    // AttackVerticalGap. Deciding on a symmetric fabs() while the swing used
+    // an asymmetric band meant the enemy committed to attacks it could not
+    // land, burning the whole attack state and cooldown standing frozen.
+    float verticalGap = AttackVerticalGap();
 
     if (m_Config.CanAttack && detected &&
         distance <= m_Config.AttackRange &&
         verticalGap <= m_Config.AttackHeight &&
-        m_AttackCooldownTimer <= 0.0f)
+        m_AttackCooldownTimer <= 0.0f &&
+        FacingTarget())
     {
-        SetState(EnemyState::Attack);
-        m_AttackRequested = true;
-        m_AttackCooldownTimer = m_Config.AttackCooldown;
-        return;
+        // Only one of a crowd may swing at a time. Everyone else falls
+        // through to Chase below and keeps their spacing.
+        if (!m_Config.NeedsAttackToken || TryTakeAttackToken())
+        {
+            SetState(EnemyState::Attack);
+            m_AttackRequested = true;
+            m_AttackCooldownTimer = m_Config.AttackCooldown;
+            return;
+        }
     }
 
     if (m_Config.CanChase && detected)
@@ -291,6 +406,23 @@ void EnemyAI::Steer()
 
     UpdateVertical();
     UpdateFacing();
+
+    // Normalise. Steer adds a separation bias straight onto the direction and
+    // UpdateVertical writes into it too, and Enemy::Update then does
+    // velocity = direction * speed - so an enemy pressed against a neighbour
+    // was travelling at up to twice its own ChaseSpeed, and a flyer moving
+    // diagonally at 1.41x. A crowded enemy outran a lone one and the player
+    // could never learn what "an enemy's speed" is.
+    //
+    // Only shrunk, never grown: a small nudge should stay a small nudge.
+    float length = sqrtf(m_MoveDirection.x * m_MoveDirection.x +
+                         m_MoveDirection.y * m_MoveDirection.y);
+
+    if (length > 1.0f)
+    {
+        m_MoveDirection.x /= length;
+        m_MoveDirection.y /= length;
+    }
 }
 
 void EnemyAI::UpdateVertical()
@@ -332,8 +464,25 @@ void EnemyAI::UpdateFacing()
     if (m_State == EnemyState::Dead || m_State == EnemyState::Stunned)
         return;
 
-    if (m_Config.FaceTarget && m_Target != nullptr &&
-        (m_State == EnemyState::Chase || m_State == EnemyState::Attack))
+    // Turn to face the target whenever it is engaged with one - including
+    // while standing perfectly still.
+    //
+    // This used to be gated on Chase or Attack alone. A Turret cannot move, so
+    // it never enters Chase and never turned: it sat facing whichever way it
+    // spawned for its whole life. That was merely odd until a swing started
+    // requiring the enemy to be facing its target (see FacingTarget), at which
+    // point a turret could never attack anything that walked up on its other
+    // side at all.
+    bool engaged = (m_State == EnemyState::Chase || m_State == EnemyState::Attack) ||
+                   (m_Aware && m_Config.CanAttack);
+
+    // Being hit turns anything round, whatever its config says. A Patroller
+    // has FaceTarget off on purpose - it walks its beat and does not care
+    // about you - but "hit it in the back and it never once looks at you"
+    // reads as broken rather than as indifferent.
+    bool mustFace = m_Config.FaceTarget || m_Alerted;
+
+    if (mustFace && m_Target != nullptr && engaged)
     {
         float dx = m_Target->GetPosition().x - m_GameObject->GetPosition().x;
         if (fabsf(dx) > 0.01f)
@@ -362,6 +511,12 @@ bool EnemyAI::TargetDetected(float Distance) const
     if (!m_Config.CanChase && !m_Config.CanAttack)
         return false;
 
+    // It gave up on this target a moment ago - let it walk away rather than
+    // re-acquiring on the next frame and going straight back to shoving the
+    // crate it could not get past.
+    if (m_DisengageTimer > 0.0f)
+        return false;
+
     bool engaged = (m_State == EnemyState::Chase || m_State == EnemyState::Attack);
     float range = (engaged && m_Config.LoseRange > 0.0f)
         ? m_Config.LoseRange
@@ -371,7 +526,114 @@ bool EnemyAI::TargetDetected(float Distance) const
         return false;
 
     float dy = fabsf(m_Target->GetPosition().y - m_GameObject->GetPosition().y);
-    return dy <= m_Config.DetectHeight;
+    if (dy > m_Config.DetectHeight)
+        return false;
+
+    // Already fighting, or just been hit: it knows where the player is and the
+    // cone stops applying. Losing track because the player stepped behind it
+    // mid-fight looks far worse than seeing a little too much.
+    if (engaged || m_Alerted)
+        return true;
+
+    return CanSeeTarget();
+}
+
+// The cone, and then the wall. Split out because it is the expensive half and
+// only worth running once range and height have already passed.
+bool EnemyAI::CanSeeTarget() const
+{
+    Vector3 self = m_GameObject->GetPosition();
+    Vector3 target = m_Target->GetPosition();
+
+    float dx = target.x - self.x;
+    float dy = target.y - self.y;
+    float length = sqrtf(dx * dx + dy * dy);
+
+    if (length > 0.0001f)
+    {
+        // m_Facing is +/-1 along X, so the dot product with it is just dx.
+        float cosAngle = (dx * m_Facing) / length;
+        if (cosAngle < cosf(m_Config.VisionHalfAngle))
+            return false;
+    }
+
+    if (!m_Config.RequireLineOfSight)
+        return true;
+
+    // Eye to eye, not foot to foot: standing next to a crate would otherwise
+    // block the enemy's view of its own feet.
+    Vector3 eye = self;
+    eye.y += m_Config.EyeHeight;
+
+    Vector3 aim = target;
+    aim.y += m_Config.EyeHeight;
+
+    return !Collision::SegmentBlocked(eye, aim, Collision::GatherSolids());
+}
+
+// Written the same way round as Enemy::CanReachTarget, so the decision to
+// swing and the swing itself can never disagree about reach.
+float EnemyAI::AttackVerticalGap() const
+{
+    if (m_Target == nullptr)
+        return 0.0f;
+
+    float dy = m_GameObject->GetPosition().y - m_Target->GetPosition().y;
+
+    if (dy > m_Config.AttackTargetHeight)
+        return dy - m_Config.AttackTargetHeight; // above the target's head
+    if (dy < 0.0f)
+        return -dy;                              // target is above this enemy
+
+    return 0.0f;
+}
+
+// Do not swing at something behind you. The owner turns the body smoothly, so
+// without this an enemy could commit to an attack mid-turn and the swing would
+// play out pointing the wrong way.
+bool EnemyAI::FacingTarget() const
+{
+    if (m_Target == nullptr)
+        return false;
+
+    float dx = m_Target->GetPosition().x - m_GameObject->GetPosition().x;
+
+    if (fabsf(dx) < 0.05f)
+        return true; // right on top of it - any facing will do
+
+    return (dx > 0.0f) == (m_Facing > 0.0f);
+}
+
+bool EnemyAI::TryTakeAttackToken()
+{
+    if (s_AttackToken == this)
+        return true;
+
+    if (s_AttackToken != nullptr)
+        return false;
+
+    if (s_TokenCooldown > 0.0f)
+        return false;
+
+    s_AttackToken = this;
+    return true;
+}
+
+void EnemyAI::ReleaseAttackToken()
+{
+    if (s_AttackToken != this)
+        return;
+
+    s_AttackToken = nullptr;
+    s_TokenCooldown = TOKEN_HANDOVER_GAP;
+}
+
+void EnemyAI::Alert()
+{
+    m_Alerted = true;
+    m_Aware = true;
+    m_ReactionTimer = 0.0f;
+    m_DisengageTimer = 0.0f;
 }
 
 Vector3 EnemyAI::SeparationBias() const
@@ -423,6 +685,10 @@ void EnemyAI::OnDamaged()
     // Poise. The damage has already been applied by the caller - this is only
     // about whether the enemy is allowed to STOP and react, and it is not
     // allowed to do that on every hit of a combo. See StunImmunity.
+    // Being hit always tells it where you are, even through its blind spot and
+    // even if it had just given up - that part is not gated by poise.
+    Alert();
+
     if (m_StunImmunityTimer > 0.0f)
         return;
 
@@ -442,6 +708,9 @@ void EnemyAI::Stun(float Time)
     m_StunTimer = Time;
     SetState(EnemyState::Stunned);
 
+    // Staggered enemies do not keep their turn to attack.
+    ReleaseAttackToken();
+
     m_MoveDirection = { 0.0f, 0.0f, 0.0f };
     m_MoveSpeed = 0.0f;
 }
@@ -449,6 +718,7 @@ void EnemyAI::Stun(float Time)
 void EnemyAI::OnDeath()
 {
     SetState(EnemyState::Dead);
+    ReleaseAttackToken();
 
     m_MoveDirection = { 0.0f, 0.0f, 0.0f };
     m_MoveSpeed = 0.0f;

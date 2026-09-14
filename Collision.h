@@ -74,4 +74,11 @@ public:
     // along whichever axis it is least deep in.
     static void PushOutOfSolids(Vector3& Position, const Vector3& HalfSize,
         const std::vector<AABB>& Solids);
+
+    // Is the straight line from A to B interrupted by a solid? The play plane
+    // is XY, so this is a 2D slab test and Z is ignored - the same assumption
+    // every other test here makes. Used for line of sight: an enemy should
+    // not see the player through a crate.
+    static bool SegmentBlocked(const Vector3& A, const Vector3& B,
+        const std::vector<AABB>& Solids);
 };

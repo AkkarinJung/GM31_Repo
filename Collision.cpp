@@ -170,6 +170,62 @@ bool Collision::MoveY(Vector3& Position, const Vector3& HalfSize, float Delta,
     return blocked;
 }
 
+bool Collision::SegmentBlocked(const Vector3& A, const Vector3& B,
+    const std::vector<AABB>& Solids)
+{
+    const float dx = B.x - A.x;
+    const float dy = B.y - A.y;
+
+    for (int i = 0; i < (int)Solids.size(); i++)
+    {
+        const AABB& solid = Solids[i];
+
+        // Slab test: clip the segment's 0..1 parameter against the box on each
+        // axis in turn. Whatever survives both is inside the box.
+        float tMin = 0.0f;
+        float tMax = 1.0f;
+        bool  miss = false;
+
+        // X
+        if (fabsf(dx) < 0.000001f)
+        {
+            if (A.x < solid.MinX() || A.x > solid.MaxX())
+                miss = true;
+        }
+        else
+        {
+            float t1 = (solid.MinX() - A.x) / dx;
+            float t2 = (solid.MaxX() - A.x) / dx;
+            if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
+            if (t1 > tMin) tMin = t1;
+            if (t2 < tMax) tMax = t2;
+        }
+
+        // Y
+        if (!miss)
+        {
+            if (fabsf(dy) < 0.000001f)
+            {
+                if (A.y < solid.MinY() || A.y > solid.MaxY())
+                    miss = true;
+            }
+            else
+            {
+                float t1 = (solid.MinY() - A.y) / dy;
+                float t2 = (solid.MaxY() - A.y) / dy;
+                if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
+                if (t1 > tMin) tMin = t1;
+                if (t2 < tMax) tMax = t2;
+            }
+        }
+
+        if (!miss && tMin <= tMax)
+            return true;
+    }
+
+    return false;
+}
+
 void Collision::PushOutOfSolids(Vector3& Position, const Vector3& HalfSize,
     const std::vector<AABB>& Solids)
 {
@@ -181,13 +237,26 @@ void Collision::PushOutOfSolids(Vector3& Position, const Vector3& HalfSize,
         if (!AABBvsAABB(body, solid))
             continue;
 
-        // Leave along the shallower axis - that is the direction the body
-        // came from, so it pops out the side it was pushed through instead
-        // of teleporting over the top.
         float overlapX = (body.HalfSize.x + solid.HalfSize.x) - fabsf(body.Center.x - solid.Center.x);
         float overlapY = (body.HalfSize.y + solid.HalfSize.y) - fabsf(body.Center.y - solid.Center.y);
 
-        if (overlapX <= overlapY)
+        // Leave along the shallower axis - but only vertically when the body
+        // really is resting on the solid or hanging under it.
+        //
+        // "Shallower axis" on its own is wrong the moment something is pushed
+        // deep into a crate's SIDE. An enemy body is 1.4 tall and a crate is
+        // 4 wide, so once a crowd has shoved it more than ~1.4 units in, X
+        // becomes the DEEPER axis and this used to pop the enemy 1.4 units
+        // straight down, through the floor of the box. The mesh field then
+        // pulled it back to the ground still inside the crate, and it did it
+        // again the next frame - which is one of the ways an enemy appeared
+        // to teleport with another enemy behind it.
+        //
+        // A genuine landing never penetrates by more than the body's own half
+        // height (MoveY stops it at the surface), so that is the test.
+        bool leaveVertically = (overlapY < overlapX) && (overlapY <= HalfSize.y);
+
+        if (!leaveVertically)
             Position.x += (body.Center.x < solid.Center.x) ? -overlapX : overlapX;
         else
             Position.y += (body.Center.y < solid.Center.y) ? -overlapY : overlapY;
