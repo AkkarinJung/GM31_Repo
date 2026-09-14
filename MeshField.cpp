@@ -34,10 +34,33 @@ static void LoadTexture(const wchar_t* FileName, ID3D11ShaderResourceView** Text
     TexMetadata metadata;
     ScratchImage image;
     LoadFromWICFile(FileName, WIC_FLAGS_NONE, &metadata, image);
-    CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
-        image.GetImageCount(), metadata, Texture);
+
+    // WIC hands back the full size image and nothing else. Tiling the ground
+    // this many times means a distant pixel covers a wide patch of texture,
+    // and with no smaller mip to read it turns into crawling noise instead of
+    // grass. Build the chain so the sampler has something to fall back to.
+    ScratchImage mipChain;
+    HRESULT hr = GenerateMipMaps(image.GetImages(), image.GetImageCount(), metadata,
+        TEX_FILTER_DEFAULT, 0, mipChain);
+
+    if (SUCCEEDED(hr))
+    {
+        CreateShaderResourceView(Renderer::GetDevice(), mipChain.GetImages(),
+            mipChain.GetImageCount(), mipChain.GetMetadata(), Texture);
+    }
+    else
+    {
+        CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+            image.GetImageCount(), metadata, Texture);
+    }
     assert(*Texture);
 }
+
+// Texture tiles per grid cell. Cells are 10 units across and the player is
+// 1.8 units tall, so at 1 tile per cell a single painted flower came out as
+// wide as the player. 3 puts a tile every 3.3 units, which reads as grass;
+// much past 4 and the repeat starts showing as a grid.
+static const float TEXTURE_TILING = 3.0f;
 
 void MeshField::Init()
 {
@@ -52,7 +75,7 @@ void MeshField::Init()
                 m_Vertex[x][z].Position = XMFLOAT3((x - 10) * 10.0f, g_FieldHeight[z][x], (z - 10) * -10.0f);
                 m_Vertex[x][z].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
                 m_Vertex[x][z].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-                m_Vertex[x][z].TexCoord = XMFLOAT2(x, z);
+                m_Vertex[x][z].TexCoord = XMFLOAT2(x * TEXTURE_TILING, z * TEXTURE_TILING);
             }
         }
 
@@ -138,12 +161,15 @@ void MeshField::Init()
     Renderer::CreatePixelShader(&m_PixelShader,
         "shader\\BumpPS.cso");
 
-    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_albedo.png", &m_Texture);
-    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_normal-ogl.png", &m_TextureNormal);
-    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_height.png", &m_TextureHeight);
-    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_roughness.png", &m_TextureRoughness);
-    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_ao.png", &m_TextureAO);
-    LoadTexture(L"asset\\texture\\grass\\stylized-grass1_metallic.png", &m_TextureMetallic);
+    LoadTexture(L"asset\\texture\\grass\\animegrass_albedo.png", &m_Texture);
+    LoadTexture(L"asset\\texture\\grass\\animegrass_normal.png", &m_TextureNormal);
+    LoadTexture(L"asset\\texture\\grass\\animegrass_height.png", &m_TextureHeight);
+    LoadTexture(L"asset\\texture\\grass\\animegrass_roughness.png", &m_TextureRoughness);
+    LoadTexture(L"asset\\texture\\grass\\animegrass_ao.png", &m_TextureAO);
+    LoadTexture(L"asset\\texture\\grass\\animegrass_metallic.png", &m_TextureMetallic);
+
+    // The same ramp the enemies shade through, so the ground bands the same way.
+    LoadTexture(L"asset\\texture\\toon_ramp.png", &m_TextureRamp);
 
     //BGM
     Audio* bgm = AddGameComponent<Audio>(this);
@@ -167,6 +193,7 @@ void MeshField::Uninit()
     m_TextureRoughness->Release();
     m_TextureAO->Release();
     m_TextureMetallic->Release();
+    m_TextureRamp->Release();
 
     GameObject::Uninit();
 }
@@ -188,7 +215,10 @@ void  MeshField::Draw()
     material.TextureEnable = true;
     Renderer::SetMaterial(material);
 
-    Renderer::SetParameter(XMFLOAT4(0.03f, 1.0f, 0.15f, 1.0f));
+    // Knobs for BumpPS: x = ramp row, y = AO strength, z = macro variation,
+    // w = normal map strength. The normal map is off: the texture is painted
+    // with its own shading and a second set of bumps on top fights it.
+    Renderer::SetParameter(XMFLOAT4(0.12f, 1.0f, 1.0f, 0.0f));
 
     ID3D11ShaderResourceView* textures[] =
     {
@@ -198,6 +228,7 @@ void  MeshField::Draw()
         m_TextureRoughness, // t3 roughness
         m_TextureAO,        // t4 ambient occlusion
         m_TextureMetallic,  // t5 metallic
+        m_TextureRamp,      // t6 toon ramp
     };
     Renderer::GetDeviceContext()->PSSetShaderResources(0, ARRAYSIZE(textures), textures);
 

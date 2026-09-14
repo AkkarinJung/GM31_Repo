@@ -21,6 +21,7 @@ private:
 	ID3D11ShaderResourceView* m_TextureRoughness;
 	ID3D11ShaderResourceView* m_TextureAO;
 	ID3D11ShaderResourceView* m_TextureMetallic;
+	ID3D11ShaderResourceView* m_TextureRamp;
 
 	VERTEX_3D m_Vertex[21][21];
 
