@@ -26,7 +26,6 @@ private:
     // reached 1.877 and could not get onto any of them.
     float m_MoveSpeed = 50.0f;
     float m_JumpPower = 25.0f;
-    class Audio* m_JumpSE;
 
     GameObject* m_Shadow;
 
@@ -84,6 +83,128 @@ private:
     // A small step into the swing, so an attack has weight behind it.
     const float m_AttackLunge = 3.0f;
 
+    // Slash VFX. Purely visual: the hitbox is Sword::Use and the two are
+    // triggered separately, so these can be tuned for looks alone.
+    // Angles are a screen-space roll in radians - 0 is a flat horizontal
+    // streak, positive rolls counter-clockwise.
+    // Slash VFX. Purely visual: the hitbox is Sword::Use and the two are
+    // triggered separately, so these are tuned for looks alone.
+    //
+    // Anchored to the player, NOT to the sword. The hand sits near the chest
+    // and sweeps through a wide arc during the swing, so a sprite centred on
+    // it landed somewhere different every time; measuring from the player
+    // puts the arc in the same readable place on every swing.
+    //
+    // Not const, and not final: the debug keys in Update() move them live -
+    // press F5 to print the numbers and paste them back here.
+    // Offset from the player, all three axes. Forward runs along the way the
+    // player faces, Height is straight up, Depth is world Z - the play plane
+    // is z=0 and the camera looks down +Z, so positive Depth pushes the arc
+    // away from the viewer and negative pulls it in front of the character.
+    // Small, because the arc is meant to wrap AROUND the character (see the
+    // reference art) rather than float out in front of him. Pushed too far
+    // forward it stops reading as his swing at all, whatever the angle is.
+    float m_SlashForward = 0.30f;
+    float m_SlashHeight = 1.00f;
+    float m_SlashDepth = -0.3f;    // slightly towards the camera, so the arc
+                                   // passes in front of the body
+
+    // Half-size of the crescent. The curve is baked into the texture, which
+    // is square, so these stay close to each other - pulling them apart
+    // squashes the arc rather than lengthening the swing. Raise both to
+    // sweep a wider circle around the character.
+    float m_SlashLength = 1.5f;
+    float m_SlashThickness = 1.5f;
+
+    // How far the arc turns as it travels, in radians. Small: the crescent
+    // already reads as a swing, and spinning it far just looks like a wheel.
+    float m_SlashSweep = 0.45f;
+
+    // Live tuning offsets, added to every slash. The debug keys in Update()
+    // move these - press F5 to print them and paste the numbers back.
+    float m_SlashPitchTune = 0.0f;
+    float m_SlashYawTune = 0.0f;
+    float m_SlashRollTune = 0.0f;
+
+    // One 3D pose per step of the combo, in radians.
+    //
+    // Roll is the one that has to be there: the arc is drawn bulging straight
+    // DOWN, so it needs a quarter turn (added in SpawnSlash) to bulge the way
+    // the player is facing. Pitch and yaw are what stop it reading as a flat
+    // sticker - they tip the plane of the swing into the scene, so the arc
+    // sweeps through depth rather than across the screen.
+    const float m_SlashPitch[3] = { 0.15f, -0.18f,  0.22f };
+    const float m_SlashYaw[3]   = { 0.28f,  0.38f, -0.32f };
+    const float m_SlashRoll[3]  = { 0.00f, -0.45f,  0.45f };
+
+    const float m_SlashLifetime = 0.18f; // short: a slash that lingers stops
+                                         // reading as a fast one
+
+    // The special/parry swing gets a bigger, slower, flatter one - it reads
+    // as a heavier, more deliberate cut.
+    const float m_SpecialSlashLength = 2.4f;
+    const float m_SpecialSlashThickness = 2.4f;
+    const float m_SpecialSlashSweep = 0.70f;
+    const float m_SpecialSlashLifetime = 0.24f;
+    const float m_SpecialSlashPitch = 0.10f;
+    const float m_SpecialSlashYaw = 0.20f;
+
+    void DebugTuneSlash();
+
+    // Samples where the sword actually is, every frame, so SpawnSlash can
+    // read off which way the blade is travelling.
+    void TrackWeaponMotion();
+
+    // Sword tracking. The direction the blade is MOVING is what the slash
+    // should line up with - not the direction it is pointing, and certainly
+    // not a fixed angle per combo step. Taking it from the motion means the
+    // arc follows whatever the animation actually does, including the swings
+    // whose fixed angles were wrong.
+    Vector3 m_PrevWeaponPos{ 0.0f, 0.0f, 0.0f };
+    Vector3 m_WeaponVelocity{ 0.0f, 0.0f, 0.0f };
+    bool m_HasWeaponHistory = false;
+
+    // How the arc's roll is decided. F10 cycles it live, so all three can be
+    // compared on the same swing without a rebuild.
+    //
+    //   0  TABLE   the fixed per-combo m_SlashRoll values
+    //   1  BLADE   which way the blade is pointing   <- default
+    //   2  MOTION  which way the sword is travelling
+    //
+    // BLADE is the one that works. The crescent bulges along its own +X, and
+    // the blade sticks out along the radius of the swing, so aiming the bulge
+    // down the blade puts the arc exactly where the steel is. It is read
+    // straight out of the sword's world matrix and is a unit vector, so
+    // unlike everything below it never gets short and noisy.
+    //
+    // Two earlier attempts and why they failed, so they are not retried:
+    //
+    //   chest -> grip. GetMatrx() gives the GRIP, which sits in the hand and
+    //   barely leaves the body: measured 0.166 units for the second combo
+    //   step against 1.053 for the third, an 8x swing in what should be a
+    //   steady reference. The blade does the sweeping, not the hand.
+    //
+    //   MOTION. A horizontal swing travels across the character, which in
+    //   this game is world Z - straight into the screen. The play plane is
+    //   XY, so almost nothing survives the projection and the angle comes
+    //   out of rounding error. Kept for the swings where it does work.
+    int m_SlashAngleMode = 1;
+
+    // Below this the source vector is too short to take an angle from, and
+    // the fixed table is used for that swing instead.
+    const float m_SlashMotionMin = 0.01f;
+
+    // The blade direction is a unit vector, so this only rejects the case
+    // where the blade points almost straight into the screen and there is no
+    // meaningful on-screen direction left.
+    const float m_SlashBladeMin = 0.25f;
+
+    // Logs the real numbers every time a slash spawns, which is the only
+    // moment that matters - a key press samples whenever the key was hit,
+    // which is usually not mid-swing. F11 turns it off once it has served
+    // its purpose.
+    bool m_SlashLogSpawn = true;
+
     //Right attack
     int m_RightAttackMPCost = 15;
 
@@ -109,6 +230,9 @@ private:
 
     void StartAttack();
     void StartRightAttack();
+
+    // Spawns the swing's slash sprite. Visual only - never damage.
+    void SpawnSlash();
 
     // The AttackRight swing on its own. StartRightAttack pays MP for it; a
     // parry gets it free, because the parry already paid.

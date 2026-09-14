@@ -8,6 +8,7 @@
 #include "Player.h"
 #include "Stats.h"
 #include "Weapon.h"
+#include "SoundEffect.h"
 
 // The reward pool. This table is the only thing that has to change to add,
 // remove or retune a reward - everything below just reads it.
@@ -71,6 +72,13 @@ void RoguelikeSystem::Update()
     // The UI owns the card layout, so it answers which card the cursor is
     // over - taking it stays this system's decision.
     int hovered = m_UI->GetCardIndexAt(Input::GetMouseX(), Input::GetMouseY());
+
+    // Only when the cursor crosses onto a new card - playing it every frame
+    // the mouse rests on one would be a buzz, not a tick.
+    if (hovered >= 0 && hovered != m_HoveredIndex)
+        SoundEffect::Play(SE::CardHover);
+
+    m_HoveredIndex = hovered;
     m_UI->SetHoveredIndex(hovered);
 
     if (hovered >= 0 && Input::GetKeyTrigger(VK_LBUTTON))
@@ -114,6 +122,8 @@ void RoguelikeSystem::SelectReward(int Index)
 
     ApplyReward(m_Choices[Index]);
     s_Taken.push_back(m_Choices[Index]); // kept so the next stage can re-apply it
+
+    SoundEffect::Play(SE::CardSelect);
 
     m_State = State::Done;
     m_Choices.clear();

@@ -26,6 +26,9 @@ private:
     class Player* m_Player = nullptr;
     std::vector<RoguelikeReward> m_Choices;
     class RoguelikeUI* m_UI = nullptr;
+    // Last card the cursor was over, so the hover tick fires on the change
+    // rather than on every frame the mouse sits still. -1 is "none".
+    int m_HoveredIndex = -1;
     // Everything taken so far this run. Each stage rebuilds the scene, so
     // the Player is a brand new object with base stats - these are applied
     // again before the new pick, which is what makes rewards stack across

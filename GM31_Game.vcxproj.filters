@@ -37,6 +37,18 @@
     <Filter Include="Source Files\Enemy">
       <UniqueIdentifier>{3b80655b-0477-4075-8829-a1aa3dc135cb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Sound">
+      <UniqueIdentifier>{ac150e1b-fe63-4f41-a8f8-8bc68bad4bf3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Sound">
+      <UniqueIdentifier>{79736919-dac9-424c-9463-73f83b4c694e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\VisualEffect">
+      <UniqueIdentifier>{9ba7dd07-7bf6-4aa1-bf1a-d9b6f5dc242a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\VisualEffect">
+      <UniqueIdentifier>{2e86eb47-07fb-4e2c-9ea2-c1aedfe55d35}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -87,9 +99,6 @@
     <ClCompile Include="Collision.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Particle.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -103,9 +112,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Score.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="audio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Shadow.cpp">
@@ -141,9 +147,6 @@
     <ClCompile Include="ControlsUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Font.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="RoguelikeSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -158,6 +161,21 @@
     </ClCompile>
     <ClCompile Include="EnemyHPBar.cpp">
       <Filter>Source Files\Enemy</Filter>
+    </ClCompile>
+    <ClCompile Include="audio.cpp">
+      <Filter>Source Files\Sound</Filter>
+    </ClCompile>
+    <ClCompile Include="SoundEffect.cpp">
+      <Filter>Source Files\Sound</Filter>
+    </ClCompile>
+    <ClCompile Include="SlashEffect.cpp">
+      <Filter>Source Files\VisualEffect</Filter>
+    </ClCompile>
+    <ClCompile Include="Font.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Particle.cpp">
+      <Filter>Source Files\VisualEffect</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -221,9 +239,6 @@
     <ClInclude Include="Collision.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Particle.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Game.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -237,9 +252,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Score.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="audio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Shadow.h">
@@ -281,9 +293,6 @@
     <ClInclude Include="ControlsUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Font.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RoguelikeReward.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -301,6 +310,21 @@
     </ClInclude>
     <ClInclude Include="EnemyHPBar.h">
       <Filter>Header Files\Enemy</Filter>
+    </ClInclude>
+    <ClInclude Include="audio.h">
+      <Filter>Header Files\Sound</Filter>
+    </ClInclude>
+    <ClInclude Include="SoundEffect.h">
+      <Filter>Header Files\Sound</Filter>
+    </ClInclude>
+    <ClInclude Include="Font.h">
+      <Filter>Header Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Particle.h">
+      <Filter>Header Files\VisualEffect</Filter>
+    </ClInclude>
+    <ClInclude Include="SlashEffect.h">
+      <Filter>Header Files\VisualEffect</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

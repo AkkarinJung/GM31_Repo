@@ -8,7 +8,7 @@
 
 #include "Manager.h"
 #include "Camera.h"
-#include "audio.h"
+#include "SoundEffect.h"
 
 #include "Tree.h"
 #include "Shadow.h"
@@ -18,6 +18,7 @@
 
 #include "BoneAttachPoint.h"
 #include "Sword.h"
+#include "SlashEffect.h"
 
 void Player::Init()
 {
@@ -53,10 +54,6 @@ void Player::Init()
 
     Renderer::CreatePixelShader(&m_PixelShader,
         "shader\\litTexturePS.cso");
-
-    //BGM
-    m_JumpSE = AddGameComponent<Audio>(this);
-    m_JumpSE->Load("asset\\Audio\\wan.wav");
 
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 1.5f ,1.5f ,1.5f });
@@ -141,6 +138,9 @@ void Player::Update()
     if (Input::GetKeyTrigger('P'))
         m_WeaponSocket->DebugPrintTransform();
 
+    DebugTuneSlash();
+    TrackWeaponMotion();
+
     // Only re-aim while actually moving. atan2f(0, 0) is 0, so reading the
     // facing every frame snapped the player (and the sword parented to it)
     // round to face +Z the moment the velocity died out, and flipped it
@@ -163,7 +163,7 @@ void Player::Update()
         //m_Scale.x = 0.5f;
         //m_Scale.z = 0.5f;
 
-        m_JumpSE->Play();
+        SoundEffect::Play(SE::Jump);
     }
 
     //return scale to original
@@ -287,10 +287,17 @@ void Player::Update()
     {
         m_AttackHitDone = true;
 
+        // Visual and hitbox are separate on purpose. The slash shows on
+        // every swing, hit or miss, and may reach further than the sword
+        // actually does - changing how it looks can never change what it
+        // damages.
+        SpawnSlash();
+
         if (m_Weapon->Use(this))
         {
             // Connected: hold the frame for a moment and kick the camera.
             m_HitStopFrames = m_HitStopOnHit;
+            SoundEffect::Play(SE::SwordHit);
 
             Camera* camera = Manager::GetGameObj<Camera>();
             if (camera != nullptr)
@@ -351,6 +358,12 @@ void Player::Update()
             SetAnimation("Idle");
         }
     }
+
+    // The frame the player touches down. oldGround is last frame's state and
+    // m_Ground has been recomputed by the collision pass above, so this fires
+    // once per landing rather than every frame on the floor.
+    if (!oldGround && m_Ground && m_Velocity.y <= 0.0f)
+        SoundEffect::Play(SE::Land);
 
     if (m_HitStopFrames > 0)
     {
@@ -455,6 +468,7 @@ bool Player::TryParry(GameObject* Attacker)
     }
 
     m_HitStopFrames = m_ParryHitStop;
+    SoundEffect::Play(SE::Parry);
 
     Camera* camera = Manager::GetGameObj<Camera>();
     if (camera != nullptr)
@@ -464,6 +478,292 @@ bool Player::TryParry(GameObject* Attacker)
         m_Stats->RestoreMP(m_ParryMPReward);
 
     return true;
+}
+
+// Where the sword is, sampled every frame, so the swing direction can be
+// measured from it. BoneAttachPoint runs at the end of this Update, so what
+// is read here is last frame's pose - consistent frame to frame, which is
+// all a velocity needs.
+void Player::TrackWeaponMotion()
+{
+    if (m_Weapon == nullptr)
+        return;
+
+    // GetMatrx() folds in the parent, so this is a real world position. The
+    // sword's own m_Position is in the model's space and would move by
+    // ~100x as much.
+    XMMATRIX swordWorld = m_Weapon->GetMatrx();
+
+    Vector3 position;
+    XMStoreFloat3((XMFLOAT3*)&position, swordWorld.r[3]);
+
+    if (m_HasWeaponHistory)
+    {
+        Vector3 delta = position - m_PrevWeaponPos;
+
+        // Smoothed, so one noisy frame - or the frame an animation switches
+        // and the hand teleports - cannot throw the arc sideways.
+        m_WeaponVelocity = m_WeaponVelocity * 0.5f + delta * 0.5f;
+    }
+    else
+    {
+        m_WeaponVelocity = Vector3(0.0f, 0.0f, 0.0f);
+        m_HasWeaponHistory = true;
+    }
+
+    m_PrevWeaponPos = position;
+}
+
+// Live tuning for the slash placement, in the same spirit as the weapon
+// socket keys above: swing, nudge, swing again, and press F5 to print the
+// numbers so they can be pasted back into Player.h. Nothing here affects
+// damage - the hitbox is Sword::Use and never reads any of it.
+//
+//   position   I / O   forward       J / L   height      8 / 9   depth (Z)
+//   rotation   4 / 5   roll          Y / 0   yaw         F6 / F7 pitch
+//   size       6 / 7   length        F8 / F9 thickness
+//   F5         print the current values
+//   F10        cycles how the swing angle is found:
+//                0 fixed table   1 chest->sword   2 sword velocity
+//   F11        toggles the per-swing [SlashSpawn] log
+void Player::DebugTuneSlash()
+{
+    const float dt = 1.0f / 60.0f;
+    const float moveStep = 1.5f * dt;
+    const float angleStep = 1.5f * dt;
+    const float scaleStep = 1.0f * dt;
+
+    if (Input::GetKeyPress('I')) m_SlashForward -= moveStep;
+    if (Input::GetKeyPress('O')) m_SlashForward += moveStep;
+    if (Input::GetKeyPress('J')) m_SlashHeight -= moveStep;
+    if (Input::GetKeyPress('L')) m_SlashHeight += moveStep;
+    if (Input::GetKeyPress('8')) m_SlashDepth -= moveStep;
+    if (Input::GetKeyPress('9')) m_SlashDepth += moveStep;
+
+    if (Input::GetKeyPress('4')) m_SlashRollTune -= angleStep;
+    if (Input::GetKeyPress('5')) m_SlashRollTune += angleStep;
+    if (Input::GetKeyPress('Y')) m_SlashYawTune -= angleStep;
+    if (Input::GetKeyPress('0')) m_SlashYawTune += angleStep;
+    if (Input::GetKeyPress(VK_F6)) m_SlashPitchTune -= angleStep;
+    if (Input::GetKeyPress(VK_F7)) m_SlashPitchTune += angleStep;
+
+    if (Input::GetKeyPress('6')) m_SlashLength -= scaleStep;
+    if (Input::GetKeyPress('7')) m_SlashLength += scaleStep;
+    if (Input::GetKeyPress(VK_F8)) m_SlashThickness -= scaleStep * 0.4f;
+    if (Input::GetKeyPress(VK_F9)) m_SlashThickness += scaleStep * 0.4f;
+
+    if (m_SlashLength < 0.1f)    m_SlashLength = 0.1f;
+    if (m_SlashThickness < 0.02f) m_SlashThickness = 0.02f;
+
+    if (Input::GetKeyTrigger(VK_F10))
+        m_SlashAngleMode = (m_SlashAngleMode + 1) % 3;
+
+    if (Input::GetKeyTrigger(VK_F11))
+        m_SlashLogSpawn = !m_SlashLogSpawn;
+
+    if (Input::GetKeyTrigger(VK_F5))
+    {
+        char buffer[256];
+        sprintf_s(buffer,
+            "[Slash] forward %.4f  height %.4f  depth %.4f"
+            "  length %.4f  thickness %.4f  sweep %.4f"
+            "  pitch %+.4f  yaw %+.4f  roll %+.4f\n",
+            m_SlashForward, m_SlashHeight, m_SlashDepth,
+            m_SlashLength, m_SlashThickness, m_SlashSweep,
+            m_SlashPitchTune, m_SlashYawTune, m_SlashRollTune);
+        OutputDebugStringA(buffer);
+
+        const char* modeName =
+            (m_SlashAngleMode == 0) ? "0 TABLE (fixed per combo)" :
+            (m_SlashAngleMode == 1) ? "1 SWORD (chest -> sword)" :
+                                      "2 MOTION (sword velocity)";
+
+        float vx = m_WeaponVelocity.x;
+        float vy = m_WeaponVelocity.y;
+
+        float sx = 0.0f, sy = 0.0f;
+        if (m_Weapon != nullptr)
+        {
+            XMMATRIX swordWorld = m_Weapon->GetMatrx();
+            Vector3 swordPos;
+            XMStoreFloat3((XMFLOAT3*)&swordPos, swordWorld.r[3]);
+            sx = swordPos.x - m_Position.x;
+            sy = swordPos.y - (m_Position.y + m_SlashHeight);
+        }
+
+        sprintf_s(buffer,
+            "[Slash] angle mode %s   (F10 cycles)\n"
+            "        sword  offset(%+.3f, %+.3f) len %.3f -> %+.1f deg\n"
+            "        motion vel   (%+.3f, %+.3f) len %.3f -> %+.1f deg\n",
+            modeName,
+            sx, sy, sqrtf(sx * sx + sy * sy), XMConvertToDegrees(atan2f(sy, sx)),
+            vx, vy, sqrtf(vx * vx + vy * vy), XMConvertToDegrees(atan2f(vy, vx)));
+        OutputDebugStringA(buffer);
+    }
+}
+
+// Spawns the swing's slash sprite. Called from the hit window, not from
+// StartAttack: at the start of a swing the sword is still behind the
+// player's back (which is why the damage waits for m_AttackHitPoint too),
+// and BoneAttachPoint - a component, so it runs at the END of this
+// Update - has not yet moved the sword onto the new animation's first pose.
+void Player::SpawnSlash()
+{
+    // Measured from the player, not from the sword. The sword's own
+    // transform is awkward twice over: m_Position on it is in the model's
+    // space rather than the world (BoneAttachPoint parents it to the player
+    // and lets GetMatrx() fold the 0.01 scale in), and even read correctly
+    // the hand sweeps through a wide arc mid-swing, so a sprite centred on
+    // it never landed in the same place twice.
+    Vector3 forward = GetFoward();
+
+    // All three axes: along the facing, up, and through depth.
+    Vector3 position = m_Position;
+    position += forward * m_SlashForward;
+    position.y += m_SlashHeight;
+    position.z += m_SlashDepth;
+
+    float length;
+    float thickness;
+    float sweep;
+    float lifetime;
+    float pitch;
+    float yaw;
+    float roll;
+
+    if (m_SpecialAttacking)
+    {
+        length = m_SpecialSlashLength;
+        thickness = m_SpecialSlashThickness;
+        sweep = m_SpecialSlashSweep;
+        lifetime = m_SpecialSlashLifetime;
+        pitch = m_SpecialSlashPitch;
+        yaw = m_SpecialSlashYaw;
+        roll = 0.0f;
+    }
+    else
+    {
+        int step = m_AttackCombo % 3;
+
+        length = m_SlashLength;
+        thickness = m_SlashThickness;
+        sweep = m_SlashSweep;
+        lifetime = m_SlashLifetime;
+        pitch = m_SlashPitch[step];
+        yaw = m_SlashYaw[step];
+        roll = m_SlashRoll[step];
+    }
+
+    pitch += m_SlashPitchTune;
+    yaw += m_SlashYawTune;
+    roll += m_SlashRollTune;
+
+    // Turning around is a mirror through the YZ plane: yaw negates, pitch is
+    // unchanged, and the roll is handled just below.
+    float facing = (forward.x < 0.0f) ? -1.0f : 1.0f;
+
+    Vector3 rotation;
+    rotation.x = pitch;
+    rotation.y = facing * yaw;
+
+    // Roll, measured off the sword rather than guessed.
+    //
+    // The crescent bulges along its own +X, so pointing that at the blade's
+    // direction of travel lines the arc up with the swing. Only the screen
+    // plane matters here - the play plane is XY - so the depth component is
+    // dropped before taking the angle.
+    //
+    // Nothing needs mirroring in this branch: if the character turns around,
+    // the sword sweeps the other way and the measured direction follows it
+    // on its own.
+    bool measured = false;
+
+    float logAlong = 0.0f;
+    float logUp = 0.0f;
+    float logLocal = 0.0f;
+
+    if (m_SlashAngleMode == 1 && m_Weapon != nullptr)
+    {
+        // Which way the blade points.
+        //
+        // sword.fbx measures X +/-0.126, Y +/-0.045, Z 0.004..1.093 - the
+        // mesh is 4.3x longer down its local Z than anything else, so the
+        // blade runs along local +Z. Row 2 of the world matrix is that axis
+        // in world space, with the socket's rotation and the player's turn
+        // already folded in.
+        XMMATRIX swordWorld = m_Weapon->GetMatrx();
+
+        XMFLOAT3 blade;
+        XMStoreFloat3(&blade, XMVector3Normalize(swordWorld.r[2]));
+
+        // Into the character's own frame, so one set of numbers describes a
+        // swing whichever way he is turned. Without this a blade pointing at
+        // world -X means "out in front" facing left and "wound up behind"
+        // facing right, and those want opposite arcs.
+        float along = blade.x * facing;  // + = pointing in front
+        float up = blade.y;
+
+        logAlong = along;
+        logUp = up;
+
+        // Only fails when the blade is aimed almost straight into the screen,
+        // where there is no on-screen direction to take.
+        if (sqrtf(along * along + up * up) > m_SlashBladeMin)
+        {
+            float local = atan2f(up, along) + m_SlashRollTune;
+            logLocal = local;
+
+            // Facing left is a mirror, and for this crescent - symmetric
+            // about its own horizontal axis - that mirror is (PI - angle).
+            rotation.z = (facing > 0.0f) ? local : (XM_PI - local);
+            measured = true;
+        }
+    }
+    else if (m_SlashAngleMode == 2)
+    {
+        float vx = m_WeaponVelocity.x;
+        float vy = m_WeaponVelocity.y;
+
+        if (sqrtf(vx * vx + vy * vy) > m_SlashMotionMin)
+        {
+            rotation.z = atan2f(vy, vx) + m_SlashRollTune;
+            measured = true;
+        }
+    }
+
+    if (!measured)
+    {
+        // Fallback: the fixed per-combo angle. The crescent is drawn already
+        // bulging right, so facing right needs no base turn; facing left is
+        // (PI - roll), which mirrors it, because the arc is symmetric about
+        // its own horizontal axis. A negative X scale would be the obvious
+        // mirror and is wrong here - back-face culling would swallow it.
+        rotation.z = (facing > 0.0f) ? roll : (XM_PI - roll);
+    }
+
+    Vector3 slashScale(length, thickness, 1.0f);
+
+    // The sweep flips with the facing too, so the blade always travels the
+    // way the character is swinging rather than back into them.
+    if (m_SlashLogSpawn)
+    {
+        char buffer[256];
+        sprintf_s(buffer,
+            "[SlashSpawn] combo %d  facing %s  mode %d  %s\n"
+            "             blade along %+.3f  up %+.3f  len %.3f"
+            "  local %+7.1f deg  -> roll %+7.1f deg\n",
+            m_SpecialAttacking ? -1 : (m_AttackCombo % 3),
+            (facing > 0.0f) ? "RIGHT" : "LEFT ",
+            m_SlashAngleMode,
+            measured ? "measured" : "FELL BACK to the table",
+            logAlong, logUp, sqrtf(logAlong * logAlong + logUp * logUp),
+            XMConvertToDegrees(logLocal),
+            XMConvertToDegrees(rotation.z));
+        OutputDebugStringA(buffer);
+    }
+
+    Manager::AddGameObj<SlashEffect>()->Play(position, rotation, slashScale,
+        lifetime, 1.0f, facing * sweep);
 }
 
 void Player::StartAttack()
@@ -489,6 +789,12 @@ void Player::StartAttack()
     const char* attackAnim =
         (m_AttackCombo == 0) ? "Attack1" :
         (m_AttackCombo == 1) ? "Attack2" : "Attack3";
+
+    // Same index that picked the animation - the combo sounds different at
+    // each step instead of repeating one swing three times.
+    SoundEffect::Play(
+        (m_AttackCombo == 0) ? SE::PlayerAttack1 :
+        (m_AttackCombo == 1) ? SE::PlayerAttack2 : SE::PlayerAttack3);
 
     SetAnimation(attackAnim);
     m_AttackAnimLength = m_AnimationModel->GetAnimationFrameCount(attackAnim);
@@ -519,6 +825,8 @@ void Player::StartCounterAttack()
     m_Velocity.x += forward.x * m_AttackLunge;
 
     m_Attacking = true;
+
+    SoundEffect::Play(SE::SpecialAttack);
 
     SetAnimation("AttackRight");
     m_AttackAnimLength = m_AnimationModel->GetAnimationFrameCount("AttackRight");

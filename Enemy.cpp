@@ -13,6 +13,7 @@
 #include "DamageNumber.h"
 #include "Player.h"
 #include "Collision.h"
+#include "SoundEffect.h"
 #include <algorithm>
 #define NOMINMAX
 #include <cmath>
@@ -137,6 +138,8 @@ void Enemy::Update()
         m_AttackWindupTime = m_AI->GetAttackDuration() * m_AttackWindupRatio;
         m_AttackWindup = m_AttackWindupTime;
         m_AttackPending = true;
+
+        SoundEffect::Play(SE::EnemyAttack);
     }
 
     if (m_AttackPending)
@@ -352,7 +355,12 @@ void Enemy::AttackTarget()
 
     Stats* stats = target->GetGameComponent<Stats>();
     if (stats != nullptr)
+    {
         stats->TakeDamage(m_AttackDamage);
+
+        if (player != nullptr)
+            SoundEffect::Play(SE::PlayerHurt);
+    }
 }
 
 void Enemy::AddDamage(int Damage)
@@ -360,6 +368,12 @@ void Enemy::AddDamage(int Damage)
     m_Stats->TakeDamage(Damage);
     m_Flash = true;
     m_AI->OnDamaged();
+
+    // The hurt grunt only for a hit it survives. On a killing blow the death
+    // sound says the same thing better, and the swing already played its own
+    // impact - three sounds on one frame just turns to mush.
+    if (!m_Stats->IsDead())
+        SoundEffect::Play(SE::EnemyHurt);
 
     DamageNumber* damageNumber = Manager::AddGameObj<DamageNumber>();
     Vector3 headPos = m_Position;
@@ -369,6 +383,11 @@ void Enemy::AddDamage(int Damage)
     if (m_Stats->IsDead())
     {
         m_AI->OnDeath();
+
+        // Played from here, not from anything attached to the enemy:
+        // SetDestory() below tears the object down and a sound it owned
+        // would be cut off in the same frame.
+        SoundEffect::Play(SE::EnemyDeath);
 
         SetDestory();
         Explosion* explosion = Manager::AddGameObj<Explosion>();

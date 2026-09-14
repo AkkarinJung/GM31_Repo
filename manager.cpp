@@ -7,6 +7,8 @@
 #include "Game.h"
 #include "Result.h"
 #include "audio.h"
+#include "SoundEffect.h"
+#include "SlashEffect.h"
 #include "Font.h"
 
 #include "GameObject.h"
@@ -23,6 +25,7 @@ void Manager::Init()
 	Renderer::Init();
 	Input::Init();
 	Audio::InitMaster();
+	SoundEffect::Init(); // after InitMaster - it borrows that XAudio2 device
 	Font::Init(L"asset\\font\\kenvector_future.ttf", L"KenVector Future", 48);
 
 	ChangeScene<Title>(0.0f);
@@ -44,6 +47,8 @@ void Manager::Uninit()
 	m_GameObjects.clear();
 
 	Font::Uninit();
+	SlashEffect::UninitShared(); // shared frames outlive every scene
+	SoundEffect::Uninit(); // before UninitMaster - its voices feed the master
 	Audio::UninitMaster();
 	Renderer::Uninit();
 	Input::Uninit();

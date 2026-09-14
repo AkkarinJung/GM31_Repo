@@ -23,6 +23,9 @@ ID3D11DepthStencilState* Renderer::m_DepthStateEnable{};
 ID3D11DepthStencilState* Renderer::m_DepthStateDisable{};
 
 
+ID3D11RasterizerState*	Renderer::m_RasterizerStateCull{};
+ID3D11RasterizerState*	Renderer::m_RasterizerStateNone{};
+
 ID3D11BlendState*		Renderer::m_BlendState{};
 ID3D11BlendState*		Renderer::m_BlendStateAdd{};
 ID3D11BlendState*		Renderer::m_BlendStateATC{};
@@ -125,10 +128,14 @@ void Renderer::Init()
 	rasterizerDesc.DepthClipEnable = TRUE; 
 	rasterizerDesc.MultisampleEnable = FALSE; 
 
-	ID3D11RasterizerState *rs;
-	m_Device->CreateRasterizerState( &rasterizerDesc, &rs );
+	m_Device->CreateRasterizerState( &rasterizerDesc, &m_RasterizerStateCull );
 
-	m_DeviceContext->RSSetState( rs );
+	// Same state with culling off, so a freely rotated quad stays visible
+	// whichever way it ends up facing.
+	rasterizerDesc.CullMode = D3D11_CULL_NONE;
+	m_Device->CreateRasterizerState( &rasterizerDesc, &m_RasterizerStateNone );
+
+	m_DeviceContext->RSSetState( m_RasterizerStateCull );
 
 
 
@@ -271,6 +278,9 @@ void Renderer::Uninit()
 	m_ParameterBuffer->Release();
 
 
+	if (m_RasterizerStateCull) { m_RasterizerStateCull->Release(); m_RasterizerStateCull = nullptr; }
+	if (m_RasterizerStateNone) { m_RasterizerStateNone->Release(); m_RasterizerStateNone = nullptr; }
+
 	m_DeviceContext->ClearState();
 	m_RenderTargetView->Release();
 	m_SwapChain->Release();
@@ -298,6 +308,14 @@ void Renderer::End()
 
 
 
+
+void Renderer::SetCullEnable( bool Enable )
+{
+	if( Enable )
+		m_DeviceContext->RSSetState( m_RasterizerStateCull );
+	else
+		m_DeviceContext->RSSetState( m_RasterizerStateNone );
+}
 
 void Renderer::SetDepthEnable( bool Enable )
 {

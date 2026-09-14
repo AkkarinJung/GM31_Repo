@@ -53,6 +53,8 @@
     <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
     <ClCompile Include="SkyDome.cpp" />
+    <ClCompile Include="SlashEffect.cpp" />
+    <ClCompile Include="SoundEffect.cpp" />
     <ClCompile Include="Stage.cpp" />
     <ClCompile Include="StageUI.cpp" />
     <ClCompile Include="Sword.cpp" />
@@ -100,6 +102,8 @@
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="SkyDome.h" />
+    <ClInclude Include="SlashEffect.h" />
+    <ClInclude Include="SoundEffect.h" />
     <ClInclude Include="Stage.h" />
     <ClInclude Include="StageUI.h" />
     <ClInclude Include="Stats.h" />

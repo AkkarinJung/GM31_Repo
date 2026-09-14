@@ -31,6 +31,8 @@
 #include "Stage.h"
 
 #include "RoguelikeSystem.h"
+#include "SoundEffect.h"
+#include "SlashEffect.h"
 
 int Game::s_Stage = 0;
 bool Game::s_RunComplete = false;
@@ -142,6 +144,11 @@ void Game::Init()
 	Manager::AddGameObj<StageUI>();
 	Manager::AddGameObj<EnemyHPBar>();
 
+	// Pull the slash frames in now. They are shared and loaded once, but
+	// doing it lazily meant the first swing of the run stalled part way
+	// through the animation while thirteen textures came off disk.
+	SlashEffect::LoadShared();
+
 	// The map is built - hand over to the reward pick before gameplay runs.
 	// Scene::Init runs exactly once per map (Manager rebuilds the scene on
 	// every change) and Start() ignores repeat calls, so the pick can never
@@ -172,6 +179,8 @@ void Game::Update()
 	if (enemies.size() == 0 && !m_Cleared)
 	{
 		m_Cleared = true;
+
+		SoundEffect::Play(SE::StageClear);
 
 		if (s_Stage + 1 < GetStageCount())
 		{

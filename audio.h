@@ -21,6 +21,10 @@ public:
 	static void InitMaster();
 	static void UninitMaster();
 
+	// SoundEffect creates its own source voices on this device, so it needs
+	// to see it. Nothing else should touch it.
+	static IXAudio2* GetXAudio() { return m_Xaudio; }
+
 	using Component::Component;
 
 	void Uninit() override;

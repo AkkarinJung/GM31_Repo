@@ -58,6 +58,9 @@ private:
 	static ID3D11DepthStencilState* m_DepthStateEnable;
 	static ID3D11DepthStencilState* m_DepthStateDisable;
 
+	static ID3D11RasterizerState*	m_RasterizerStateCull;
+	static ID3D11RasterizerState*	m_RasterizerStateNone;
+
 	static ID3D11BlendState*		m_BlendState;
 	static ID3D11BlendState*		m_BlendStateAdd;
 	static ID3D11BlendState*		m_BlendStateATC;
@@ -71,6 +74,10 @@ public:
 	static void End();
 
 	static void SetDepthEnable(bool Enable);
+	// Back-face culling. Off lets a quad be seen from behind - anything
+	// rotated freely in 3D (see SlashEffect) turns its back to the camera
+	// for half of its possible orientations and would otherwise vanish.
+	static void SetCullEnable(bool Enable);
 	static void SetATCEnable(bool Enable);
 	static void SetAddBlendEnable(bool Enable);
 	static void SetWorldViewProjection2D();
