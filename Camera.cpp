@@ -4,6 +4,12 @@
 #include "Camera.h"
 #include "Player.h"
 #include "input.h"
+#include "Game.h"
+
+// How far from the map edge the camera stops. The end hedge reaches 6 units
+// towards the camera, so this has to clear its corner by more than the near
+// plane - and by enough that a shake cannot close the gap.
+static const float CAMERA_EDGE_MARGIN = 5.0f;
 
 void Camera::Init()
 {
@@ -43,6 +49,23 @@ void Camera::Update()
     // left-of-center and the camera stays put until they walk past it.
 
         m_Target.x = m_Target.x * (1.0f - t) + playerPos.x * t;
+
+    // Stop at the map edge instead of following the player into it. The
+    // camera sits 7 units back, so at the far right it ends up about one unit
+    // from the near corner of the end hedge - and the near plane is 1.0, so
+    // the wall clips and you see straight through it. Holding the camera back
+    // is also just how a side scroller handles the end of a level: the player
+    // keeps walking and moves towards the edge of the screen instead.
+    float leftLimit = Game::MapLeft + CAMERA_EDGE_MARGIN;
+    float rightLimit = Game::MapRight - CAMERA_EDGE_MARGIN;
+
+    if (leftLimit < rightLimit)
+    {
+        if (m_Target.x < leftLimit)
+            m_Target.x = leftLimit;
+        if (m_Target.x > rightLimit)
+            m_Target.x = rightLimit;
+    }
 
     m_Target += m_Shake * cosf(m_ShakeTime * 100.0f);
     m_ShakeTime += dt;

@@ -31,6 +31,13 @@ public:
 	void Draw() override;
 
 
+	// The playable span in x. The hedges that wall the map in stand on these,
+	// and Camera stops short of them - walk the camera all the way to the
+	// edge and the near end of a hedge lands inside the near plane, which is
+	// what lets you see through it.
+	static const float MapLeft;
+	static const float MapRight;
+
 	static int GetStageIndex() { return s_Stage; }
 	static bool IsRunComplete() { return s_RunComplete; }
 

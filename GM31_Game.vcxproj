@@ -36,6 +36,7 @@
     <ClCompile Include="Font.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Grass.cpp" />
+    <ClCompile Include="Hedge.cpp" />
     <ClCompile Include="HPBar.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="main.cpp" />
@@ -84,6 +85,7 @@
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Grass.h" />
+    <ClInclude Include="Hedge.h" />
     <ClInclude Include="HPBar.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="main.h" />

@@ -3,6 +3,7 @@
 #include "Collision.h"
 #include "manager.h"
 #include "Box.h"
+#include "Hedge.h"
 #include <algorithm>
 
 static float Clamp(float value, float minValue, float maxValue)
@@ -81,6 +82,22 @@ std::vector<AABB> Collision::GatherSolids()
     auto boxes = Manager::GetGameObjs<Box>();
     for (auto box : boxes)
         solids.push_back(SolidFromBox(box->GetPosition(), box->GetScale()));
+
+    // The map edge. A hedge stands on its position the same way a crate does,
+    // but its half size comes off the model it loaded rather than its scale,
+    // so the invisible wall is always the size of the hedge you can see.
+    auto hedges = Manager::GetGameObjs<Hedge>();
+    for (auto hedge : hedges)
+    {
+        Vector3 halfSize = hedge->GetSolidHalfSize();
+        Vector3 position = hedge->GetPosition();
+
+        AABB solid;
+        solid.Center = Vector3(position.x, position.y + halfSize.y, position.z);
+        solid.HalfSize = halfSize;
+
+        solids.push_back(solid);
+    }
 
     return solids;
 }

@@ -26,6 +26,7 @@
 #include "HPBar.h"
 #include "ControlsUI.h"
 #include "StatsUI.h"
+#include "Hedge.h"
 
 #include "StageUI.h"
 #include "EnemyHPBar.h"
@@ -73,6 +74,41 @@ void Game::ResetProgress()
 	RoguelikeSystem::ResetRun(); // a new run starts with no rewards carried over
 }
 
+// How far the player can walk either way. The stages put enemies between
+// x = -9 and x = 17, so this leaves a margin at both ends rather than ending
+// the map on top of the last fight.
+const float Game::MapLeft = -16.0f;
+const float Game::MapRight = 24.0f;
+
+// The player is pinned to z = 0 and only ever moves in x and y, so two walls
+// is the whole boundary. These run along z purely so they fill the screen -
+// nothing can walk round them.
+static const float HEDGE_SEGMENT_LENGTH = 4.0f;
+static const int HEDGE_SEGMENTS = 3;
+
+// A wall of hedges at each end of the map, turned a quarter so their long
+// side runs across the camera. Collision::GatherSolids picks them up, so the
+// invisible wall comes from the same objects and needs nothing else.
+static void BuildMapEdge()
+{
+	const float quarterTurn = 1.5707963f;
+
+	for (int side = 0; side < 2; side++)
+	{
+		float x = (side == 0) ? Game::MapLeft : Game::MapRight;
+
+		for (int i = 0; i < HEDGE_SEGMENTS; i++)
+		{
+			// Centred on z = 0, which is the plane the player walks on.
+			float z = (i - (HEDGE_SEGMENTS - 1) * 0.5f) * HEDGE_SEGMENT_LENGTH;
+
+			Hedge* hedge = Manager::AddGameObj<Hedge>();
+			hedge->SetPosition({ x, 0.0f, z });
+			hedge->SetRotation({ 0.0f, quarterTurn, 0.0f });
+		}
+	}
+}
+
 void Game::Init()
 {
 	
@@ -83,6 +119,8 @@ void Game::Init()
 	Manager::AddGameObj<SkyDome>();
 
 	Player* player = Manager::AddGameObj<Player>();
+
+	BuildMapEdge();
 
 	// Everything that makes this stage different from the next comes out of
 	// the stage table - see Stage.cpp.
