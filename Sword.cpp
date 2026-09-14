@@ -43,9 +43,16 @@ bool Sword::Use(GameObject* Owner)
     float damage = m_Damage + (ownerStats != nullptr ? (float)ownerStats->GetAttack() : 0.0f);
     damage *= m_DamageMultiplier;
 
+    // Rolled once for the swing, not once per enemy, so a swing that hits two
+    // enemies crits on both or neither - one roll, one number colour.
+    bool critical = false;
+
     float criticalChance = ownerStats != nullptr ? ownerStats->GetCriticalChance() : 0.0f;
     if ((float)rand() / RAND_MAX < criticalChance)
+    {
         damage *= m_CriticalDamage;
+        critical = true;
+    }
 
     int attackPower = (int)(damage + 0.5f); // round, don't truncate
     if (attackPower < 1)
@@ -71,7 +78,7 @@ bool Sword::Use(GameObject* Owner)
         if (Vector3::dot(forward, toEnemy) < m_AngleDot)
             continue;
 
-        enemy->AddDamage(attackPower);
+        enemy->AddDamage(attackPower, critical);
         enemy->Shake(forward * 0.5f);
         hit = true;
     }

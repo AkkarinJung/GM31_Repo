@@ -4,6 +4,11 @@
 #include "manager.h"
 #include "Camera.h"
 
+// How far apart the digits sit, against the size they are drawn at. The sheet
+// leaves a margin round every glyph, so a full digitSize of pitch reads as a
+// gap - under 1 closes it up without the art colliding.
+#define DIGIT_SPACING (0.70f)
+
 #define SPRITE_ROW (5)
 #define SPRITE_COLUMNS (5)
 
@@ -135,6 +140,12 @@ void DamageNumber::Draw()
     const float w = 1.0f / (float)SPRITE_COLUMNS;
     const float h = 1.0f / (float)SPRITE_ROW;
     const float digitSize = 32.0f;// <--- SIZE
+    const float digitAdvance = digitSize * DIGIT_SPACING;
+
+    // The quad used to run from the anchor downwards, so the number hung below
+    // the point it was given. Sit it above instead - the anchor is the bottom
+    // of the number now, which is where a popup over a head wants to be.
+    const float digitTop = -digitSize;
 
     UINT stride = sizeof(VERTEX_3D);
     UINT offset = 0;
@@ -156,7 +167,11 @@ void DamageNumber::Draw()
 
     const float signWidth = digitSize * 0.6f;
     const float signGap = digitSize * 0.15f;
-    float totalWidth = digitSize * digitCount + (drawSign ? signWidth + signGap : 0.0f);
+
+    // The last digit still takes its full width; only the pitch between them
+    // shrinks. Getting this wrong puts the number off centre as it grows.
+    float digitsWidth = digitAdvance * (digitCount - 1) + digitSize;
+    float totalWidth = digitsWidth + (drawSign ? signWidth + signGap : 0.0f);
     float startX = -totalWidth * 0.5f;
     float digitStartX = startX + (drawSign ? signWidth + signGap : 0.0f);
 
@@ -170,29 +185,29 @@ void DamageNumber::Draw()
         int digit = digits[digitCount - 1 - i]; // most-significant first
         float u = (digit % SPRITE_COLUMNS) * w;
         float v = (digit / SPRITE_COLUMNS) * h;
-        float x = digitStartX + i * digitSize;
+        float x = digitStartX + i * digitAdvance;
 
         D3D11_MAPPED_SUBRESOURCE msr{};
         if (SUCCEEDED(Renderer::GetDeviceContext()->Map(m_VertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr)))
         {
             VERTEX_3D* vertex = (VERTEX_3D*)msr.pData;
 
-            vertex[0].Position = XMFLOAT3(x, 0.0f, 0.0f);
+            vertex[0].Position = XMFLOAT3(x, digitTop, 0.0f);
             vertex[0].Normal = XMFLOAT3(0, 0, 0);
             vertex[0].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[0].TexCoord = XMFLOAT2(u, v);
 
-            vertex[1].Position = XMFLOAT3(x + digitSize, 0.0f, 0.0f);
+            vertex[1].Position = XMFLOAT3(x + digitSize, digitTop, 0.0f);
             vertex[1].Normal = XMFLOAT3(0, 0, 0);
             vertex[1].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[1].TexCoord = XMFLOAT2(u + w, v);
 
-            vertex[2].Position = XMFLOAT3(x, digitSize, 0.0f);
+            vertex[2].Position = XMFLOAT3(x, digitTop + digitSize, 0.0f);
             vertex[2].Normal = XMFLOAT3(0, 0, 0);
             vertex[2].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[2].TexCoord = XMFLOAT2(u, v + h);
 
-            vertex[3].Position = XMFLOAT3(x + digitSize, digitSize, 0.0f);
+            vertex[3].Position = XMFLOAT3(x + digitSize, digitTop + digitSize, 0.0f);
             vertex[3].Normal = XMFLOAT3(0, 0, 0);
             vertex[3].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[3].TexCoord = XMFLOAT2(u + w, v + h);
@@ -210,7 +225,7 @@ void DamageNumber::Draw()
         Renderer::SetMaterial(material);
 
         float barThickness = digitSize * 0.15f;
-        float midY = digitSize * 0.5f;
+        float midY = digitTop + digitSize * 0.5f; // follows the digits up
 
         DrawFlatQuad(startX, midY - barThickness * 0.5f, signWidth, barThickness); // horizontal bar (both + and -)
 

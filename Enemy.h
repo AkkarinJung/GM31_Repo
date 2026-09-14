@@ -91,7 +91,9 @@ public:
         m_Shake = Shake;
         m_ShakeTime = 0;
     }
-    void AddDamage(int Damage);
+    // Critical only changes how the damage number reads - the extra damage
+    // is already in Damage by the time it gets here.
+    void AddDamage(int Damage, bool Critical = false);
 
     // Spawn-time configuration: Manager::AddGameObj<Enemy>()->GetAI()->Configure(...)
     class EnemyAI* GetAI() const { return m_AI; }

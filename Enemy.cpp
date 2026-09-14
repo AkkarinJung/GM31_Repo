@@ -363,7 +363,12 @@ void Enemy::AttackTarget()
     }
 }
 
-void Enemy::AddDamage(int Damage)
+// The popup is tinted through Material.Diffuse, which multiplies the digit
+// sprite rather than replacing it - so this works whatever colour the sheet is.
+static const XMFLOAT4 DAMAGE_COLOUR = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+static const XMFLOAT4 CRITICAL_COLOUR = XMFLOAT4(1.0f, 0.22f, 0.18f, 1.0f);
+
+void Enemy::AddDamage(int Damage, bool Critical)
 {
     m_Stats->TakeDamage(Damage);
     m_Flash = true;
@@ -377,8 +382,9 @@ void Enemy::AddDamage(int Damage)
 
     DamageNumber* damageNumber = Manager::AddGameObj<DamageNumber>();
     Vector3 headPos = m_Position;
-    headPos.y += 1.5f * m_BaseScale; // above the head, scales with the enemy's size
-    damageNumber->Init(headPos, Damage);
+    headPos.y += 2.3f * m_BaseScale; // above the head, scales with the enemy's size
+    damageNumber->Init(headPos, Damage, false,
+        Critical ? CRITICAL_COLOUR : DAMAGE_COLOUR);
 
     if (m_Stats->IsDead())
     {
