@@ -23,6 +23,7 @@
 
 #include "GameObject.h"
 #include "Result.h"
+#include "Fade.h"
 #include "Stats.h"
 
 #include "HPBar.h"
@@ -477,6 +478,12 @@ void Game::Init()
 		if (stats != nullptr)
 			stats->SetHP(s_CarriedHP);
 	}
+
+	// Last, so it is on top of everything the map just built. It keeps
+	// running through the reward pick's pause - see Fade and
+	// GameObject::UpdatesWhilePaused - so the cards are dealt onto a screen
+	// that has actually faded up.
+	Fade::In(0.5f);
 }
 
 
@@ -522,12 +529,14 @@ void Game::Update()
 
 			s_Stage++;
 			Manager::ChangeScene<Game>(3.0f);
+			Fade::OutBefore(3.0f);
 		}
 		else
 		{
 			// Last stage cleared - the run is over.
 			s_RunComplete = true;
 			Manager::ChangeScene<Result>(3.0f);
+			Fade::OutBefore(3.0f);
 		}
 	}
 }

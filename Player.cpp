@@ -22,6 +22,7 @@
 #include "Sword.h"
 #include "Result.h"
 #include "Particle.h"
+#include "Fade.h"
 
 // How far through the current swing, 0..1. Anything that is not mid-swing
 // reads as finished, so callers do not have to special-case it.
@@ -284,6 +285,7 @@ void Player::UpdateDeath()
     {
         m_ResultRequested = true;
         Manager::ChangeScene<Result>(2.0f);
+        Fade::OutBefore(2.0f);
     }
 
     GameObject::Update();

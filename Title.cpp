@@ -10,6 +10,7 @@
 #include "audio.h"
 #include "Font.h"
 #include "SoundEffect.h"
+#include "Fade.h"
 
 #include <math.h>
 
@@ -97,6 +98,10 @@ void Title::Init()
     Audio* bgm = background->AddGameComponent<Audio>(background);
     bgm->Load("asset\\Audio\\BGM\\TitleBGM.wav");
     bgm->Play(true);
+
+    // Open out of black. Every scene does this, so a transition is always
+    // a pair: the outgoing scene fades to black, the incoming one fades up.
+    Fade::In(0.5f);
 }
 
 void Title::Uninit()

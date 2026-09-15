@@ -12,6 +12,7 @@
 #include "audio.h"
 #include "RoguelikeSystem.h"
 #include "Stage.h"
+#include "Fade.h"
 
 #include "GameObject.h"
 
@@ -119,6 +120,11 @@ void Result::Init()
     Manager::AddGameObj<Polygon2D>()->Init(
         ButtonX(), BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT,
         L"asset\\texture\\Button_Emty.png");
+    // Open out of black. Every scene does this, so a transition is always
+    // a pair: the outgoing scene fades to black, the incoming one fades up.
+    Fade::In(0.5f);
+
+
 }
 
 void Result::Uninit()
@@ -149,6 +155,7 @@ void Result::Update()
     {
         SoundEffect::Play(SE::CardSelect);
         Manager::ChangeScene<Title>(3.0f);
+        Fade::OutBefore(3.0f);
     }
 }
 
