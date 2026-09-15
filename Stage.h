@@ -33,6 +33,13 @@ struct BoxSpawn
 struct StageData
 {
     const char* Name;
+
+    // How far the map runs in x. The walls, the tree line, the scenery and
+    // the camera limits are all built from these, so widening a stage is one
+    // pair of numbers rather than a global constant every stage has to share.
+    float Left;
+    float Right;
+
     const EnemySpawn* Enemies;
     int EnemyCount;
     const BoxSpawn* Boxes;

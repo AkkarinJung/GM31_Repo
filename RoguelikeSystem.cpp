@@ -10,29 +10,133 @@
 #include "Weapon.h"
 #include "SoundEffect.h"
 
-// The reward pool. This table is the only thing that has to change to add,
-// remove or retune a reward - everything below just reads it.
-// Each line is: stat, amount, label. Whether the amount is flat or a ratio is
-// decided by the apply switch further down, and spelled out in the label.
-// 4th arg: false = flat amount (5.0f -> "+5"), true = ratio (0.20f -> "+20%")
-static const RoguelikeReward s_RewardPool[] =
+// The reward table. One line per EFFECT, not per card: the rarity roll
+// decides the size, so a card that exists at four tiers is still one row.
+//
+// BaseValue is what the effect is worth at Common, in the units the apply
+// switch further down expects. ShowAsPercent only changes how it PRINTS.
+static const RewardDef s_RewardPool[] =
 {
-    CommonReward(CommonStat::MaxHP,          20.0f, "+20 Max HP"),
-    CommonReward(CommonStat::AttackPower,     3.0f, "+3 Attack"),
-    CommonReward(CommonStat::Defense,         2.0f, "+2 Defense"),
-    CommonReward(CommonStat::CriticalChance,  0.10f, "+10% Critical Chance"),
-    CommonReward(CommonStat::MoveSpeed,       0.10f, "+10% Move Speed"),
-    CommonReward(CommonStat::JumpPower,       0.15f, "+15% Jump Power"),
+    // ---- the player ----
+    { RewardCategory::Common, (int)CommonStat::MaxHP,          20.0f,  false, false, "Max HP" },
+    { RewardCategory::Common, (int)CommonStat::AttackPower,     3.0f,  false, false, "Attack" },
+    { RewardCategory::Common, (int)CommonStat::Defense,         2.0f,  false, false, "Defense" },
+    { RewardCategory::Common, (int)CommonStat::CriticalChance,  0.08f, true,  false, "Critical Chance" },
+    { RewardCategory::Common, (int)CommonStat::MoveSpeed,       0.08f, true,  false, "Move Speed" },
+    { RewardCategory::Common, (int)CommonStat::JumpPower,       0.10f, true,  false, "Jump Power" },
 
-    WeaponReward(WeaponStat::Damage,          0.15f, "+15% Weapon Damage"),
-    WeaponReward(WeaponStat::AttackSpeed,     0.10f, "+10% Attack Speed"),
-    WeaponReward(WeaponStat::Range,           0.20f, "+20% Range"),
-    WeaponReward(WeaponStat::CriticalDamage,  0.25f, "+25% Critical Damage"),
+    // ---- the MP economy ----
+    // The special is the only thing that spends MP and the parry is the main
+    // thing that returns it, so these are the cards that decide how often the
+    // player can afford to answer a telegraph.
+    { RewardCategory::Common, (int)CommonStat::MaxMP,          15.0f,  false, false, "Max MP" },
+    { RewardCategory::Common, (int)CommonStat::MPRegen,         1.0f,  false, false, "MP per Second" },
+    { RewardCategory::Common, (int)CommonStat::SpecialCost,     0.12f, true,  true,  "Special Cost" },
+    { RewardCategory::Common, (int)CommonStat::ParryReward,     3.0f,  false, false, "MP per Parry" },
+    { RewardCategory::Common, (int)CommonStat::ParryWindow,     0.10f, true,  false, "Parry Window" },
+
+    // ---- the weapon ----
+    { RewardCategory::Weapon, (int)WeaponStat::Damage,          0.15f, true,  false, "Weapon Damage" },
+    { RewardCategory::Weapon, (int)WeaponStat::AttackSpeed,     0.10f, true,  false, "Attack Speed" },
+    { RewardCategory::Weapon, (int)WeaponStat::Range,           0.15f, true,  false, "Range" },
+    { RewardCategory::Weapon, (int)WeaponStat::CriticalDamage,  0.25f, true,  false, "Critical Damage" },
+    { RewardCategory::Weapon, (int)WeaponStat::VerticalReach,   0.15f, true,  false, "Vertical Reach" },
 };
 
 static const int s_RewardPoolSize = (int)(sizeof(s_RewardPool) / sizeof(s_RewardPool[0]));
 
+// What each tier multiplies BaseValue by.
+//
+// Deliberately gentle at the top. A Legendary is a good roll, not a different
+// game: at 3.6x, the biggest move-speed card is +29%, which is noticeable
+// without making the player impossible to control. Push the top entry much
+// past 4 and the percentage cards start breaking things they were never
+// balanced against.
+static const float RARITY_SCALE[(int)RewardRarity::Count] =
+{
+    1.0f,  // Common
+    1.8f,  // Rare
+    2.6f,  // Epic
+    3.6f,  // Legendary
+};
+
+// How often each tier comes up. Out of 100.
+static const int RARITY_WEIGHT[(int)RewardRarity::Count] =
+{
+    60, // Common
+    25, // Rare
+    11, // Epic
+    4,  // Legendary
+};
+
+const char* RarityName(RewardRarity Rarity)
+{
+    switch (Rarity)
+    {
+    case RewardRarity::Rare:      return "RARE";
+    case RewardRarity::Epic:      return "EPIC";
+    case RewardRarity::Legendary: return "LEGENDARY";
+    case RewardRarity::Common:
+    default:                      return "COMMON";
+    }
+}
+
 std::vector<RoguelikeReward> RoguelikeSystem::s_Taken;
+
+static RewardRarity RollRarity()
+{
+    int total = 0;
+    for (int i = 0; i < (int)RewardRarity::Count; i++)
+        total += RARITY_WEIGHT[i];
+
+    int roll = rand() % total;
+
+    for (int i = 0; i < (int)RewardRarity::Count; i++)
+    {
+        roll -= RARITY_WEIGHT[i];
+        if (roll < 0)
+            return (RewardRarity)i;
+    }
+
+    return RewardRarity::Common;
+}
+
+// Turns a definition plus a rarity into the card the player actually gets.
+//
+// The printed number and the applied number are rounded from the SAME value,
+// so the card can never lie: if it says +36 Max HP the player gets exactly 36,
+// not 36.4 rounded down somewhere else in the apply switch.
+static RoguelikeReward BuildReward(const RewardDef& Def, RewardRarity Rarity)
+{
+    RoguelikeReward reward;
+    reward.Category = Def.Category;
+    reward.Rarity = Rarity;
+    reward.Stat = Def.Stat;
+
+    float scaled = Def.BaseValue * RARITY_SCALE[(int)Rarity];
+
+    int shown;
+    if (Def.ShowAsPercent)
+    {
+        shown = (int)(scaled * 100.0f + 0.5f);
+        if (shown < 1) shown = 1;
+        reward.Value = (float)shown / 100.0f;
+    }
+    else
+    {
+        shown = (int)(scaled + 0.5f);
+        if (shown < 1) shown = 1;
+        reward.Value = (float)shown;
+    }
+
+    sprintf_s(reward.Name, "%s%d%s %s",
+        Def.ShowNegative ? "-" : "+",
+        shown,
+        Def.ShowAsPercent ? "%" : "",
+        Def.Label);
+
+    return reward;
+}
 
 void RoguelikeSystem::Start(Player* Owner, int ChoiceCount)
 {
@@ -98,8 +202,9 @@ void RoguelikeSystem::GenerateChoices(int Count)
     if (Count > s_RewardPoolSize)
         Count = s_RewardPoolSize;
 
-    // Draw without replacement so the same reward cannot appear twice in
-    // one set of cards.
+    // Draw the EFFECTS without replacement so the same stat cannot appear
+    // twice in one set of cards. The rarity is rolled per card afterwards,
+    // so two cards can share a tier - that part is meant to repeat.
     std::vector<int> remaining;
     for (int i = 0; i < s_RewardPoolSize; i++)
         remaining.push_back(i);
@@ -107,7 +212,7 @@ void RoguelikeSystem::GenerateChoices(int Count)
     for (int i = 0; i < Count; i++)
     {
         int pick = rand() % (int)remaining.size();
-        m_Choices.push_back(s_RewardPool[remaining[pick]]);
+        m_Choices.push_back(BuildReward(s_RewardPool[remaining[pick]], RollRarity()));
         remaining.erase(remaining.begin() + pick);
     }
 }
@@ -189,6 +294,38 @@ void RoguelikeSystem::ApplyCommon(const RoguelikeReward& Reward)
     case CommonStat::JumpPower:
         m_Player->SetJumpPower(m_Player->GetJumpPower() * (1.0f + Reward.Value));
         break;
+
+    // ---- the MP economy ----
+    case CommonStat::MaxMP:
+        // SetMaxMP refills MP as well, exactly like SetMaxHP. Harmless for
+        // the same reason: the pick happens before the map starts, with the
+        // player already full.
+        if (stats != nullptr)
+            stats->SetMaxMP(stats->GetMaxMP() + (int)Reward.Value);
+        break;
+
+    case CommonStat::MPRegen:
+        m_Player->SetMPRegenPerSecond(m_Player->GetMPRegenPerSecond() + Reward.Value);
+        break;
+
+    case CommonStat::SpecialCost:
+    {
+        // A reduction, and it must never reach zero or the special stops
+        // being a decision. One MP is the floor.
+        int cost = (int)(m_Player->GetSpecialMPCost() * (1.0f - Reward.Value) + 0.5f);
+        if (cost < 1)
+            cost = 1;
+        m_Player->SetSpecialMPCost(cost);
+        break;
+    }
+
+    case CommonStat::ParryReward:
+        m_Player->SetParryMPReward(m_Player->GetParryMPReward() + (int)Reward.Value);
+        break;
+
+    case CommonStat::ParryWindow:
+        m_Player->SetParryTime(m_Player->GetParryTime() * (1.0f + Reward.Value));
+        break;
     }
 }
 
@@ -216,6 +353,10 @@ void RoguelikeSystem::ApplyWeapon(const RoguelikeReward& Reward)
 
     case WeaponStat::CriticalDamage:
         weapon->SetCriticalDamage(weapon->GetCriticalDamage() + Reward.Value);
+        break;
+
+    case WeaponStat::VerticalReach:
+        weapon->SetVerticalReach(weapon->GetVerticalReach() * (1.0f + Reward.Value));
         break;
     }
 }

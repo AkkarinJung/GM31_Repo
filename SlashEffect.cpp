@@ -174,6 +174,18 @@ void SlashEffect::Play(const Vector3& Position, const Vector3& Rotation, const V
     m_Timer = 0.0f;
 }
 
+void SlashEffect::FollowWeapon(GameObject* Weapon, float Reach, float Depth)
+{
+    m_Follow = Weapon;
+    m_FollowReach = Reach;
+    m_FollowDepth = Depth;
+
+    // The blade supplies the sweep now, so the baked-in one would double it.
+    m_Sweep = 0.0f;
+
+    m_HasFollowRoll = false;
+}
+
 void SlashEffect::Update()
 {
     const float dt = 1.0f / 60.0f;
@@ -184,6 +196,37 @@ void SlashEffect::Update()
     {
         SetDestory();
         return;
+    }
+
+    if (m_Follow != nullptr)
+    {
+        // Row 3 of the world matrix is the grip in world space; row 2 is the
+        // blade's own axis, with the socket's rotation and the player's turn
+        // already folded in. sword.fbx measures 4.3x longer down its local Z
+        // than anything else, which is why that row is the blade.
+        XMMATRIX world = m_Follow->GetMatrx();
+
+        Vector3 grip;
+        XMStoreFloat3((XMFLOAT3*)&grip, world.r[3]);
+
+        XMFLOAT3 blade;
+        XMStoreFloat3(&blade, XMVector3Normalize(world.r[2]));
+
+        m_Position = grip + Vector3(blade.x, blade.y, blade.z) * m_FollowReach;
+        m_Position.z += m_FollowDepth;
+
+        // Measured in world space, so nothing needs mirroring when the player
+        // turns around - the sword has already turned with him.
+        float flat = sqrtf(blade.x * blade.x + blade.y * blade.y);
+
+        if (flat > m_FollowRollMin)
+        {
+            m_FollowRoll = atan2f(blade.y, blade.x);
+            m_HasFollowRoll = true;
+        }
+
+        if (m_HasFollowRoll)
+            m_BaseRoll = m_FollowRoll;
     }
 
     GameObject::Update();

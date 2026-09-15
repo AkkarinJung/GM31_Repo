@@ -23,6 +23,17 @@ static const float HEDGE_HEIGHT = 3.6f;
 // is right for a crate and wrong for the edge of the map.
 static const float HEDGE_SOLID_HEIGHT = 200.0f;
 
+// How thick the invisible wall is, for the same reason the height above is
+// what it is: the map edge should not inherit the model's proportions.
+//
+// hedge_straight_long.fbx is long and thin, so scaling it to 4 units long
+// leaves its collider about 0.3 units thick. That is thin enough to be
+// fragile - a body only has to end a frame 0.15 units past the middle of it
+// to be pushed out the far side instead of back into the map. One unit costs
+// nothing (the camera stops five units short of the edge, so nobody sees the
+// player halt a fraction early) and takes the margin from 0.15 to 0.5.
+static const float HEDGE_SOLID_THICKNESS = 1.0f;
+
 void Hedge::Init()
 {
     m_Layer = 1;
@@ -50,20 +61,20 @@ void Hedge::Init()
 
     // AnimationModel::Draw sets its own material and texture but not the
     // shaders, so this has to bind them itself - the same as Box.
+    // The toon shader already in the project - shader\toonVS.cso and
+    // shader\toonPS.cso, the same pair Enemy loads.
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout,
-        "shader\\unlitTextureVS.cso");
+        "shader\\toonVS.cso");
 
     Renderer::CreatePixelShader(&m_PixelShader,
-        "shader\\unlitTexturePS.cso");
-}
+        "shader\\toonPS.cso");
 
-void Hedge::Uninit()
-{
-    if (m_VertexLayout) m_VertexLayout->Release();
-    if (m_VertexShader) m_VertexShader->Release();
-    if (m_PixelShader) m_PixelShader->Release();
-
-    GameObject::Uninit();
+    TexMetadata metadata;
+    ScratchImage image;
+    LoadFromWICFile(L"asset\\texture\\toon_ramp.png", WIC_FLAGS_NONE, &metadata, image);
+    CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+        image.GetImageCount(), metadata, &m_RampTexture);
+    assert(m_RampTexture);
 }
 
 void Hedge::Update()
@@ -89,7 +100,22 @@ Vector3 Hedge::GetSolidHalfSize() const
         halfZ = swap;
     }
 
+    // Applied after the swap, so it always thickens the axis the player walks
+    // into rather than the one the wall runs along.
+    if (halfX < HEDGE_SOLID_THICKNESS * 0.5f)
+        halfX = HEDGE_SOLID_THICKNESS * 0.5f;
+
     return Vector3(halfX, halfY, halfZ);
+}
+
+void Hedge::Uninit()
+{
+    if (m_VertexLayout) { m_VertexLayout->Release(); m_VertexLayout = nullptr; }
+    if (m_VertexShader) { m_VertexShader->Release(); m_VertexShader = nullptr; }
+    if (m_PixelShader) { m_PixelShader->Release();  m_PixelShader = nullptr; }
+    if (m_RampTexture) { m_RampTexture->Release(); m_RampTexture = nullptr; }
+
+    GameObject::Uninit();
 }
 
 void Hedge::Draw()
@@ -97,6 +123,12 @@ void Hedge::Draw()
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
     Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
+
+    Renderer::SetParameter(m_Parameter);
+
+    // t0 is the model's own texture, set by AnimationModel::Draw.
+    // Only the ramp has to be bound here.
+    Renderer::GetDeviceContext()->PSSetShaderResources(1, 1, &m_RampTexture);
 
     GameObject::Draw();
 }

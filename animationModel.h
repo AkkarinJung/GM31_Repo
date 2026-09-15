@@ -77,4 +77,14 @@ public:
 	// time-sampled duration, so this is how long a one-shot animation
 	// like an attack actually plays for before it should loop/end.
 	int GetAnimationFrameCount(const std::string& AnimationName) const;
+
+	// Every loaded clip: how many keys it has, what rate the FILE says it was
+	// authored at, and how long that makes it.
+	//
+	// Worth printing once, because Update() takes an integer frame and indexes
+	// the keys directly - it never looks at mTicksPerSecond. Playback is
+	// therefore always one key per game frame. A clip authored at 30fps runs
+	// at double speed, one at 24fps at two and a half times, and nothing in
+	// the code says so.
+	void DebugPrintAnimationInfo() const;
 };

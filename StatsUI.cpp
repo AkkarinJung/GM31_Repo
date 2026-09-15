@@ -41,7 +41,17 @@ static const XMFLOAT4 COLOUR_LABEL = XMFLOAT4(0.72f, 0.76f, 0.85f, 1.0f);
 static const XMFLOAT4 COLOUR_VALUE = XMFLOAT4(1.0f, 0.96f, 0.80f, 1.0f);
 static const XMFLOAT4 COLOUR_HP = XMFLOAT4(0.85f, 0.25f, 0.30f, 1.0f);
 static const XMFLOAT4 COLOUR_MP = XMFLOAT4(0.30f, 0.55f, 0.90f, 1.0f);
-static const XMFLOAT4 COLOUR_REWARD = XMFLOAT4(0.60f, 0.90f, 0.65f, 1.0f);
+// The run's rewards are listed in their own rarity colour, matching the card
+// frames they were taken from. Without this a Legendary and a Common read
+// identically here, and the only place rarity was ever visible was the two
+// seconds the card was on screen.
+static const XMFLOAT4 COLOUR_BY_RARITY[(int)RewardRarity::Count] =
+{
+    { 0.78f, 0.76f, 0.74f, 1.0f }, // Common
+    { 0.45f, 0.72f, 1.00f, 1.0f }, // Rare
+    { 0.72f, 0.50f, 1.00f, 1.0f }, // Epic
+    { 1.00f, 0.80f, 0.30f, 1.0f }, // Legendary
+};
 
 
 void StatsUI::Init()
@@ -345,7 +355,12 @@ void StatsUI::Draw()
 
         for (int i = 0; i < rewardCount; i++)
         {
-            Font::Draw(taken[i].Name, panelX + LABEL_X + 14.0f, rowY, 19.0f, COLOUR_REWARD);
+            int rarity = (int)taken[i].Rarity;
+            if (rarity < 0 || rarity >= (int)RewardRarity::Count)
+                rarity = 0;
+
+            Font::Draw(taken[i].Name, panelX + LABEL_X + 14.0f, rowY, 19.0f,
+                COLOUR_BY_RARITY[rarity]);
             rowY += 26.0f;
         }
     }

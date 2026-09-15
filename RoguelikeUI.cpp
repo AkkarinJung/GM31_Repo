@@ -13,12 +13,42 @@ struct SpriteRect
 static const float SHEET_WIDTH = 1536.0f;
 static const float SHEET_HEIGHT = 1024.0f;
 
-// Frames and icons come in matching colours - blue reads as "you", gold as
-// "your weapon", which is the only difference a player has to notice.
-static const SpriteRect CARD_COMMON = { 1008.0f, 108.0f, 240.0f, 289.0f }; // blue frame
-static const SpriteRect CARD_WEAPON = { 1008.0f, 425.0f, 240.0f, 292.0f }; // gold frame
-static const SpriteRect ICON_COMMON = { 1357.0f, 304.0f,  99.0f,  99.0f }; // blue diamond
-static const SpriteRect ICON_WEAPON = { 1354.0f, 550.0f, 105.0f, 106.0f }; // gold diamond
+// Frame colour is RARITY, not category. The sheet carries four frames and
+// four matching diamonds - grey, blue, purple, gold - which is exactly the
+// four tiers, so nothing had to be drawn for this.
+//
+// The frames used to mean category instead (blue = player, gold = weapon),
+// which wasted half the art and collided with itself the moment rarity
+// existed: "Common" was both a category and a tier. Category is the word
+// printed on the card now, and it reads PLAYER or WEAPON.
+//
+// Rects measured off the sheet itself rather than eyeballed.
+static const SpriteRect CARD_BY_RARITY[(int)RewardRarity::Count] =
+{
+    {  734.0f, 110.0f, 243.0f, 285.0f }, // Common    - grey
+    { 1010.0f, 110.0f, 237.0f, 287.0f }, // Rare      - blue
+    {  734.0f, 428.0f, 243.0f, 285.0f }, // Epic      - purple
+    { 1010.0f, 428.0f, 237.0f, 285.0f }, // Legendary - gold
+};
+
+static const SpriteRect ICON_BY_RARITY[(int)RewardRarity::Count] =
+{
+    { 1358.0f, 180.0f,  97.0f,  99.0f },
+    { 1358.0f, 304.0f,  97.0f,  99.0f },
+    { 1356.0f, 428.0f, 101.0f, 101.0f },
+    { 1354.0f, 552.0f, 103.0f, 103.0f },
+};
+
+// The category line, tinted to match its frame so the card reads as one
+// piece rather than as a grey label stuck on gold.
+static const XMFLOAT4 TINT_BY_RARITY[(int)RewardRarity::Count] =
+{
+    { 0.78f, 0.76f, 0.74f, 1.0f }, // Common
+    { 0.45f, 0.72f, 1.00f, 1.0f }, // Rare
+    { 0.72f, 0.50f, 1.00f, 1.0f }, // Epic
+    { 1.00f, 0.80f, 0.30f, 1.0f }, // Legendary
+};
+
 static const SpriteRect BANNER      = {   64.0f, 827.0f, 800.0f,  77.0f };
 
 // Card layout, in screen pixels. The art is 240x289, so the card keeps that
@@ -88,8 +118,9 @@ void RoguelikeUI::SetSystem(RoguelikeSystem* System)
     const std::vector<RoguelikeReward>& choices = m_System->GetChoices();
     for (int i = 0; i < (int)choices.size(); i++)
     {
-        sprintf_s(buffer, "[%d] %s : %s\n", i + 1,
-            choices[i].Category == RewardCategory::Common ? "Common" : "Weapon",
+        sprintf_s(buffer, "[%d] %-9s %-6s : %s\n", i + 1,
+            RarityName(choices[i].Rarity),
+            choices[i].Category == RewardCategory::Common ? "PLAYER" : "WEAPON",
             choices[i].Name);
         OutputDebugStringA(buffer);
     }
@@ -302,9 +333,12 @@ void RoguelikeUI::Draw()
     {
         const RoguelikeReward& reward = choices[i];
 
-        bool common = reward.Category == RewardCategory::Common;
-        const SpriteRect& frame = common ? CARD_COMMON : CARD_WEAPON;
-        const SpriteRect& icon = common ? ICON_COMMON : ICON_WEAPON;
+        int rarity = (int)reward.Rarity;
+        if (rarity < 0 || rarity >= (int)RewardRarity::Count)
+            rarity = 0;
+
+        const SpriteRect& frame = CARD_BY_RARITY[rarity];
+        const SpriteRect& icon = ICON_BY_RARITY[rarity];
 
         float x, y, width, height;
         GetCardRect(i, count, x, y, width, height);
@@ -329,8 +363,11 @@ void RoguelikeUI::Draw()
         float iconSize = width * 0.34f;
         DrawSprite(icon, centerX - iconSize * 0.5f, y + height * 0.16f, iconSize, iconSize, white);
 
-        Font::DrawCentered(common ? "COMMON" : "WEAPON", centerX, y + height * 0.52f, 20.0f,
-            XMFLOAT4(0.75f, 0.78f, 0.85f, 1.0f));
+        // Category, in the frame's own colour. The frame says how rare the
+        // card is; this says what it touches.
+        Font::DrawCentered(
+            reward.Category == RewardCategory::Common ? "PLAYER" : "WEAPON",
+            centerX, y + height * 0.52f, 20.0f, TINT_BY_RARITY[rarity]);
 
         // the reward name, wrapped inside the darker footer panel
         DrawWrapped(reward.Name, centerX, footerY + 18.0f, width - 34.0f, 21.0f, white);

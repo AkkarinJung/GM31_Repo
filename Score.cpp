@@ -6,6 +6,8 @@
 #define SPRITE_COLUMNS (5)
 #define NUM_SPRTIE (SPRITE_ROW * SPRITE_COLUMNS)
 
+int Score::s_RunTotal = 0;
+
 void Score::Init()
 {
     m_Layer = 4;

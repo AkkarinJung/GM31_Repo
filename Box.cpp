@@ -45,20 +45,20 @@ void Box::Init()
     m_FitOffset.z = -(boundsMin.z + boundsMax.z) * 0.5f * m_FitScale.z;
 
     // シェーダー読込
+    // The toon shader already in the project - shader\toonVS.cso and
+    // shader\toonPS.cso, the same pair Enemy loads.
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout,
-        "shader\\unlitTextureVS.cso");
+        "shader\\toonVS.cso");
 
     Renderer::CreatePixelShader(&m_PixelShader,
-        "shader\\unlitTexturePS.cso");
-}
+        "shader\\toonPS.cso");
 
-void Box::Uninit()
-{
-    m_VertexLayout->Release();
-    m_VertexShader->Release();
-    m_PixelShader->Release();
-
-    GameObject::Uninit();
+    TexMetadata metadata;
+    ScratchImage image;
+    LoadFromWICFile(L"asset\\texture\\toon_ramp.png", WIC_FLAGS_NONE, &metadata, image);
+    CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+        image.GetImageCount(), metadata, &m_RampTexture);
+    assert(m_RampTexture);
 }
 
 void Box::Update()
@@ -69,14 +69,27 @@ void Box::Update()
     GameObject::Update();
 }
 
+void Box::Uninit()
+{
+    if (m_VertexLayout) { m_VertexLayout->Release(); m_VertexLayout = nullptr; }
+    if (m_VertexShader) { m_VertexShader->Release(); m_VertexShader = nullptr; }
+    if (m_PixelShader) { m_PixelShader->Release();  m_PixelShader = nullptr; }
+    if (m_RampTexture) { m_RampTexture->Release(); m_RampTexture = nullptr; }
+
+    GameObject::Uninit();
+}
+
 void Box::Draw()
 {
-    // 入力レイアウト設定
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
-
-    // シェーダ設定
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
     Renderer::GetDeviceContext()->PSSetShader(m_PixelShader, NULL, 0);
+
+    Renderer::SetParameter(m_Parameter);
+
+    // t0 is the model's own texture, set by AnimationModel::Draw.
+    // Only the ramp has to be bound here.
+    Renderer::GetDeviceContext()->PSSetShaderResources(1, 1, &m_RampTexture);
 
     // Same as GameObject::Draw, with the model fit from Init applied in front
     // of the object's own transform.

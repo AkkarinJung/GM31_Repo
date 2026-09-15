@@ -5,6 +5,7 @@
 #include "animationModel.h"
 #include "input.h"
 #include "Collision.h"
+#include "Game.h"
 
 #include "Manager.h"
 #include "Camera.h"
@@ -19,6 +20,163 @@
 #include "BoneAttachPoint.h"
 #include "Sword.h"
 #include "SlashEffect.h"
+
+// How far through the current swing, 0..1. Anything that is not mid-swing
+// reads as finished, so callers do not have to special-case it.
+float Player::AttackProgress() const
+{
+    if (!m_Attacking || m_AttackAnimLength <= 0)
+        return 1.0f;
+
+    // Relative to the slice being played, not to the whole clip - the clip
+    // may start partway in and always ends early, and every phase boundary
+    // below is expressed in this space.
+    float t = (m_AttackFrame - m_AttackClipFirst) / m_AttackClipSpan;
+    return (t < 0.0f) ? 0.0f : (t > 1.0f ? 1.0f : t);
+}
+
+// Turns "the swing should take this many seconds" into "advance the key
+// index by this much per tick", for whichever clip just started.
+//
+// Called once per swing rather than per frame: the clip length cannot change
+// mid-swing, so there is nothing here worth recomputing 60 times a second.
+// Where the real swing sits inside each attack clip.
+//
+// Start/End are fractions of the CLIP. HitPoint/HitEnd are fractions of the
+// SLICE those cut out - so they stay correct when a slice is re-cut.
+//
+// These are measured, not guessed. Press F4 and read DebugMeasureSwing's
+// output: it walks the clip, tracks how fast the weapon hand moves, and
+// reports the contact key and the shoulders of the swing.
+//
+// Attack1 is what the measurement actually found, and it is worth reading as
+// a warning about the defaults it replaced:
+//
+//   137 keys. The hand accelerates from key ~34, peaks at key 49 - that is
+//   the blade arriving - and is spent by key 59. Keys 60-136, a clear 56% of
+//   the clip, are the character drifting its arm back to neutral.
+//
+//   Playing the clip from key 0 to key 109 (the old global 0.00-0.80) opened
+//   the hitbox at key 38, eleven keys and about 0.18s BEFORE the sword got
+//   there, and then spent fifty keys of recovery budget on the drift home.
+//   Slicing 34..67 instead puts contact on the key the blade actually lands
+//   on and leaves every phase running at 1.0-1.15 keys per tick, which for
+//   an engine that does not interpolate between keys is the whole ballgame.
+//
+// A clip with no row here falls back to the old whole-clip behaviour: safe,
+// just not tuned. Measure it and add a row.
+struct SwingSlice
+{
+    const char* Name;
+    float Start;    // fraction of the clip the slice begins at
+    float End;      // fraction of the clip it ends at
+    float HitPoint; // fraction of the SLICE the blade lands on
+    float HitEnd;   // fraction of the SLICE the hitbox closes at
+};
+
+static const SwingSlice SWING_SLICES[] =
+{
+    // All four measured. Every slice is 33 keys wide because the time budgets
+    // fix it: ~15 keys of windup, 6 of strike, 12 of follow through is what
+    // 0.22s/0.10s/0.18s buys at a bit over one key per tick. So the whole
+    // table is really one number per clip - where the blade lands - with the
+    // slice hung around it. HitPoint and HitEnd come out identical for that
+    // reason; they are not copy-paste.
+    //
+    // name           start     end   hit   hitEnd        contact  clip
+    { "Attack1",      0.248f, 0.489f, 0.455f, 0.636f }, // key  49  of 137
+    { "Attack2",      0.421f, 0.669f, 0.455f, 0.636f }, // key  71  of 133
+    { "Attack3",      0.220f, 0.582f, 0.455f, 0.636f }, // key  35  of  91
+    { "AttackRight",  0.337f, 0.663f, 0.455f, 0.636f }, // key  49  of 101
+};
+
+void Player::SetupSwingClock(const char* AnimationName)
+{
+    // Defaults are the untuned whole-clip behaviour, so a clip that is not in
+    // the table still swings - it just swings the old way.
+    m_AttackClipStart = 0.00f;
+    m_AttackClipEnd = 0.80f;
+    m_AttackHitPoint = 0.35f;
+    m_AttackHitEnd = 0.55f;
+
+    if (AnimationName != nullptr)
+    {
+        for (const SwingSlice& slice : SWING_SLICES)
+        {
+            if (strcmp(slice.Name, AnimationName) == 0)
+            {
+                m_AttackClipStart = slice.Start;
+                m_AttackClipEnd = slice.End;
+                m_AttackHitPoint = slice.HitPoint;
+                m_AttackHitEnd = slice.HitEnd;
+                break;
+            }
+        }
+    }
+
+    if (m_AttackAnimLength <= 0)
+    {
+        m_AttackClipFirst = 0.0f;
+        m_AttackClipLast = 1.0f;
+        m_AttackClipSpan = 1.0f;
+        return;
+    }
+
+    m_AttackClipFirst = (float)m_AttackAnimLength * m_AttackClipStart;
+    m_AttackClipLast = (float)m_AttackAnimLength * m_AttackClipEnd;
+
+    m_AttackClipSpan = m_AttackClipLast - m_AttackClipFirst;
+    if (m_AttackClipSpan < 1.0f)
+    {
+        // Degenerate slice (a clip of one or two keys, or start/end set
+        // crossed over) - fall back to the whole clip rather than dividing
+        // by ~0 and launching the frame counter into the wrap in Update().
+        m_AttackClipFirst = 0.0f;
+        m_AttackClipLast = (float)m_AttackAnimLength;
+        m_AttackClipSpan = (float)m_AttackAnimLength;
+    }
+
+    // Keys to cover in each phase / ticks that phase is allowed to take.
+    const float TICKS = 60.0f;
+    float windupKeys = m_AttackClipSpan * m_AttackHitPoint;
+    float strikeKeys = m_AttackClipSpan * (m_AttackHitEnd - m_AttackHitPoint);
+    float recoverKeys = m_AttackClipSpan * (1.0f - m_AttackHitEnd);
+
+    m_AttackRateWindup = windupKeys / (m_SwingWindupTime * TICKS);
+    m_AttackRateStrike = strikeKeys / (m_SwingActiveTime * TICKS);
+    m_AttackRateRecover = recoverKeys / (m_SwingRecoverTime * TICKS);
+
+    // A rate of 0 would stall the swing forever - it never reaches the end
+    // test and m_Attacking never clears, which locks movement permanently.
+    const float MIN_RATE = 0.05f;
+    if (m_AttackRateWindup < MIN_RATE)  m_AttackRateWindup = MIN_RATE;
+    if (m_AttackRateStrike < MIN_RATE)  m_AttackRateStrike = MIN_RATE;
+    if (m_AttackRateRecover < MIN_RATE) m_AttackRateRecover = MIN_RATE;
+
+    // Ceiling, for clips with no measured row yet.
+    //
+    // Holding the timings fixed means a phase that has to cover a lot of keys
+    // covers them fast, and past about 2 keys a tick this engine stops
+    // reading as a fast animation and starts reading as a broken one - there
+    // is no interpolation between keys, so a rate of 5 does not blur, it
+    // shows every fifth pose. An unmeasured clip keeps its whole 130-180 key
+    // body and lands squarely in that range.
+    //
+    // A clipped phase overruns its budget rather than strobing, so those
+    // swings are slower than the numbers above ask for. That is the right
+    // trade: an untuned swing that plays smoothly and late beats one that
+    // hits on time and flickers. Measure the clip and the ceiling stops
+    // mattering - every phase of a measured slice sits near 1.1.
+    const float MAX_RATE = 2.0f;
+    if (m_AttackRateWindup > MAX_RATE)  m_AttackRateWindup = MAX_RATE;
+    if (m_AttackRateStrike > MAX_RATE)  m_AttackRateStrike = MAX_RATE;
+    if (m_AttackRateRecover > MAX_RATE) m_AttackRateRecover = MAX_RATE;
+}
+
+bool Player::MovementLocked() const
+{
+    return m_Attacking && AttackProgress() < m_AttackMoveUnlock;
+}
 
 void Player::Init()
 {
@@ -38,6 +196,11 @@ void Player::Init()
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_3.fbx", "Attack3");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_Right.fbx", "AttackRight");
     m_AnimationModel->DebugPrintBoneNames();
+
+    // Playback is one key per game frame with no reference to the rate the
+    // clips were authored at - see AnimationModel::DebugPrintAnimationInfo.
+    // This says, in the output window, whether that is a problem here.
+    m_AnimationModel->DebugPrintAnimationInfo();
 
     m_AnimationName = "Idle";
     m_NextAnimationName = "Idle";
@@ -60,6 +223,7 @@ void Player::Init()
 
     m_Stats = AddGameComponent<Stats>(this);
     m_Stats->SetMaxHP(100);
+    m_Stats->SetMaxMP(50); // explicit rather than relying on the Stats default
     m_Stats->SetAttack(5); // base unarmed attack - weapons add on top of this
     m_Stats->SetDefense(2);
 }
@@ -77,9 +241,11 @@ void Player::Update()
 {
     // 1/2/3 jump to the start / middle / end of the current swing, which is
     // how you check the grip at the extremes of the animation (F2 freezes).
-    if (Input::GetKeyTrigger('1') && m_Attacking) { m_NextAnimationFrame = 0; m_Blend = 1.0f; }
-    if (Input::GetKeyTrigger('2') && m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength / 2; m_Blend = 1.0f; }
-    if (Input::GetKeyTrigger('3') && m_Attacking) { m_NextAnimationFrame = m_AttackAnimLength - 1; m_Blend = 1.0f; }
+    // These drive the swing clock, not the frame it derives - setting the
+    // frame alone would be overwritten on the very next tick.
+    if (Input::GetKeyTrigger('1') && m_Attacking) { m_AttackFrame = m_AttackClipFirst; m_NextAnimationFrame = (int)m_AttackFrame; m_Blend = 1.0f; }
+    if (Input::GetKeyTrigger('2') && m_Attacking) { m_AttackFrame = m_AttackClipFirst + m_AttackClipSpan * 0.5f; m_NextAnimationFrame = (int)m_AttackFrame; m_Blend = 1.0f; }
+    if (Input::GetKeyTrigger('3') && m_Attacking) { m_AttackFrame = m_AttackClipLast - 1.0f; m_NextAnimationFrame = (int)m_AttackFrame; m_Blend = 1.0f; }
 
     if (Input::GetKeyTrigger(VK_F2))
         m_FreezeAnimation = !m_FreezeAnimation;
@@ -93,7 +259,14 @@ void Player::Update()
     float dt = 1.0 / 60.0f;
 
     if (Input::GetKeyTrigger(VK_F4))
-        DebugDumpSwing("Attack1", "mixamorig:RightHand");
+    {
+        // Every attack clip, not just the first - the slice has to be set per
+        // clip and they are all different lengths.
+        DebugMeasureSwing("Attack1", "mixamorig:RightHand");
+        DebugMeasureSwing("Attack2", "mixamorig:RightHand");
+        DebugMeasureSwing("Attack3", "mixamorig:RightHand");
+        DebugMeasureSwing("AttackRight", "mixamorig:RightHand");
+    }
 
     bool oldGround = m_Ground;
     m_Ground = false;
@@ -103,16 +276,20 @@ void Player::Update()
     // face any other direction. Locked out while attacking.
     bool move = false;
 
-    if (!m_Attacking)
+    if (!MovementLocked())
     {
+        // Full speed out of a swing, reduced while the recovery plays out -
+        // enough to reposition, not enough to make the recovery free.
+        float speed = m_Attacking ? m_MoveSpeed * m_AttackMoveScale : m_MoveSpeed;
+
         if (Input::GetKeyPress('D'))
         {
-            m_Velocity.x += m_MoveSpeed * dt;
+            m_Velocity.x += speed * dt;
             move = true;
         }
         if (Input::GetKeyPress('A'))
         {
-            m_Velocity.x -= m_MoveSpeed * dt;
+            m_Velocity.x -= speed * dt;
             move = true;
         }
     }
@@ -139,7 +316,6 @@ void Player::Update()
         m_WeaponSocket->DebugPrintTransform();
 
     DebugTuneSlash();
-    TrackWeaponMotion();
 
     // Only re-aim while actually moving. atan2f(0, 0) is 0, so reading the
     // facing every frame snapped the player (and the sword parented to it)
@@ -148,7 +324,15 @@ void Player::Update()
     // Not while attacking either: the lunge and the recoil are velocity too,
     // and reading the facing off them spun the player away from the enemy
     // mid-swing.
-    if (!m_Attacking && (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f))
+    // Gated on "is the player steering", not on "is the velocity non-zero".
+    // The lunge and the recoil are velocity too, and reading the facing off
+    // them spun the player away from the enemy mid-swing - but once movement
+    // is back during recovery, a held direction should turn him.
+    bool steering = !MovementLocked() && move; // recovery, or free to move
+    bool coasting = !m_Attacking;              // normal movement, key released
+
+    if ((steering || coasting) &&
+        (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f))
         m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
 
     // oldGround, not m_Ground: m_Ground was cleared at the top of Update and
@@ -230,6 +414,25 @@ void Player::Update()
     // put the player inside a crate.
     Collision::PushOutOfSolids(m_Position, m_BodyHalfSize, solids);
 
+    // And the map edge gets the last word after that.
+    //
+    // This is a backstop, not the fix: MoveX sweeps now and the edge hedges
+    // carry a minimum-thickness collider, so nothing should reach here out of
+    // bounds. But every other guard is collision code that can be defeated by
+    // a bad frame, and being outside the map is unrecoverable - there is no
+    // floor, no way back, and the camera has already stopped. A hard clamp
+    // costs two comparisons and makes it impossible rather than unlikely.
+    if (m_Position.x < Game::MapLeft + m_BodyHalfSize.x)
+    {
+        m_Position.x = Game::MapLeft + m_BodyHalfSize.x;
+        if (m_Velocity.x < 0.0f) m_Velocity.x = 0.0f;
+    }
+    else if (m_Position.x > Game::MapRight - m_BodyHalfSize.x)
+    {
+        m_Position.x = Game::MapRight - m_BodyHalfSize.x;
+        if (m_Velocity.x > 0.0f) m_Velocity.x = 0.0f;
+    }
+
 
     //if (!oldGround && m_Ground)
     //{
@@ -253,6 +456,13 @@ void Player::Update()
             m_Stats->RestoreMP(whole);
             m_MPRegenCarry -= (float)whole;
         }
+    }
+    else
+    {
+        // Full: drop the part-point. Keeping it meant the first point after
+        // the next spend arrived early by however much had been banked while
+        // the bar sat full, which made the regen rate look inconsistent.
+        m_MPRegenCarry = 0.0f;
     }
 
     // Cancels out of a normal swing. Requiring !m_Attacking silently ate the
@@ -285,7 +495,7 @@ void Player::Update()
     // for exactly one.
     if (m_Attacking && m_AttackAnimLength > 0)
     {
-        int windowOpen = (int)(m_AttackAnimLength * m_AttackHitPoint);
+        int windowOpen = (int)(m_AttackClipFirst + m_AttackClipSpan * m_AttackHitPoint);
 
         // Latched on >=, exactly as the single frame version was, so nothing
         // that moves the frame counter in jumps (hit stop, the 1/2/3 debug
@@ -295,7 +505,7 @@ void Player::Update()
         {
             m_AttackHitDone = true;
 
-            int windowClose = (int)(m_AttackAnimLength * m_AttackHitEnd);
+            int windowClose = (int)(m_AttackClipFirst + m_AttackClipSpan * m_AttackHitEnd);
             m_AttackHitFrames = windowClose - windowOpen + 1;
             if (m_AttackHitFrames < 1)
                 m_AttackHitFrames = 1;
@@ -332,7 +542,10 @@ void Player::Update()
         }
     }
 
-    if (m_Attacking && m_NextAnimationFrame >= m_AttackAnimLength)
+    // Against the float clock and the slice end, not the key index and the
+    // clip length: the slice stops short of the clip, and the key index is
+    // wrapped by AnimationModel::Update() so it can never report the overrun.
+    if (m_Attacking && m_AttackFrame >= m_AttackClipLast)
     {
         m_Attacking = false;
         m_SpecialAttacking = false;
@@ -347,7 +560,7 @@ void Player::Update()
     {
         bool canStart = !m_Attacking ||
             (m_AttackHitDone &&
-                m_NextAnimationFrame >= (int)(m_AttackAnimLength * m_ComboCancelPoint));
+                m_AttackFrame >= m_AttackClipFirst + m_AttackClipSpan * m_ComboCancelPoint);
 
         if (canStart)
         {
@@ -397,8 +610,37 @@ void Player::Update()
     }
     else if (!m_FreezeAnimation)
     {
+        if (m_Attacking && m_AttackAnimLength > 0)
+        {
+            // The swing accelerates through its own phases. A flat one key
+            // per frame is what made every part of the swing take the same
+            // time, so there was no moment of impact in it.
+            float t = AttackProgress();
+
+            float rate = (t < m_AttackHitPoint) ? m_AttackRateWindup
+                       : (t < m_AttackHitEnd)   ? m_AttackRateStrike
+                                                : m_AttackRateRecover;
+
+            m_AttackFrame += rate;
+            m_NextAnimationFrame = (int)m_AttackFrame;
+
+            // AnimationModel::Update() does f = Frame % numKeys, so a key
+            // index that reaches the clip length wraps to 0 - the neutral
+            // pose - for the one tick between the clock passing the slice end
+            // and the end test below clearing m_Attacking. That is a visible
+            // snap to T-pose-ish at the end of every swing. Only reachable
+            // with a slice that runs to the last key (ClipEnd 1.0, or the
+            // degenerate fallback in SetupSwingClock), but it costs one line
+            // to make unreachable.
+            if (m_NextAnimationFrame >= m_AttackAnimLength)
+                m_NextAnimationFrame = m_AttackAnimLength - 1;
+        }
+        else
+        {
+            m_NextAnimationFrame++;
+        }
+
         m_AnimationFrame++;
-        m_NextAnimationFrame++;
         m_Blend += 0.1f;
         if (m_Blend > 1.0f)
             m_Blend = 1.0f;
@@ -481,6 +723,192 @@ void Player::DebugDumpSwing(const char* AnimationName, const char* BoneName)
     }
 }
 
+// The clip slice is the one number in the swing tuning that cannot be
+// reasoned about from outside - it depends entirely on how the artist
+// exported the motion. So measure it rather than guess it.
+//
+// Method: step the clip a key at a time, ask where the weapon hand is, and
+// difference it. The hand's speed profile of a sword swing is a single sharp
+// spike (the strike) sitting on a low plateau (settling in and out). The
+// spike's peak is the contact frame and its shoulders are where the usable
+// motion begins and ends. Everything outside them is the character walking
+// its arms back to neutral, which the blend into Idle/Run already covers.
+void Player::DebugMeasureSwing(const char* AnimationName, const char* BoneName)
+{
+    const int MAX_KEYS = 512;
+    int frameCount = m_AnimationModel->GetAnimationFrameCount(AnimationName);
+
+    char buffer[256];
+    if (frameCount <= 2 || frameCount > MAX_KEYS)
+    {
+        sprintf_s(buffer, "--- %s: %d keys, nothing to measure ---\n",
+            AnimationName, frameCount);
+        OutputDebugStringA(buffer);
+        return;
+    }
+
+    static float speed[MAX_KEYS];
+    XMFLOAT3 prev{ 0.0f, 0.0f, 0.0f };
+    bool havePrev = false;
+    float peakSpeed = 0.0f;
+    int peakFrame = 0;
+
+    for (int f = 0; f < frameCount; f++)
+    {
+        m_AnimationModel->Update(AnimationName, f, AnimationName, f, 1.0f);
+
+        XMMATRIX boneMatrix;
+        if (!m_AnimationModel->GetBoneMatrix(BoneName, &boneMatrix))
+        {
+            speed[f] = 0.0f;
+            continue;
+        }
+
+        XMVECTOR scale, rotQuat, translation;
+        XMMatrixDecompose(&scale, &rotQuat, &translation, boneMatrix);
+
+        XMFLOAT3 pos;
+        XMStoreFloat3(&pos, translation);
+
+        if (havePrev)
+        {
+            float dx = pos.x - prev.x;
+            float dy = pos.y - prev.y;
+            float dz = pos.z - prev.z;
+            speed[f] = sqrtf(dx * dx + dy * dy + dz * dz);
+        }
+        else
+        {
+            speed[f] = 0.0f; // no previous key to difference against
+        }
+
+        if (speed[f] > peakSpeed)
+        {
+            peakSpeed = speed[f];
+            peakFrame = f;
+        }
+
+        prev = pos;
+        havePrev = true;
+    }
+
+    sprintf_s(buffer, "--- %s (%d keys) ---\n", AnimationName, frameCount);
+    OutputDebugStringA(buffer);
+
+    if (peakSpeed <= 0.0f)
+    {
+        sprintf_s(buffer, "  hand '%s' never moves - wrong bone name?\n", BoneName);
+        OutputDebugStringA(buffer);
+        return;
+    }
+
+    // Sparkline, so the shape can be eyeballed instead of trusted. One
+    // column per 1/48th of the clip, height 0-9 relative to the peak.
+    const int COLS = 48;
+    char spark[COLS + 1];
+    for (int c = 0; c < COLS; c++)
+    {
+        int from = (int)((float)c * frameCount / COLS);
+        int to = (int)((float)(c + 1) * frameCount / COLS);
+        if (to <= from) to = from + 1;
+        if (to > frameCount) to = frameCount;
+
+        float peak = 0.0f;
+        for (int f = from; f < to; f++)
+            if (speed[f] > peak) peak = speed[f];
+
+        int h = (int)(peak / peakSpeed * 9.0f);
+        spark[c] = (char)('0' + (h < 0 ? 0 : (h > 9 ? 9 : h)));
+    }
+    spark[COLS] = '\0';
+    sprintf_s(buffer, "  hand speed |%s|\n", spark);
+    OutputDebugStringA(buffer);
+
+    // Shoulders of the spike: walk out from the peak to where the hand drops
+    // below a fraction of its fastest. Reported for context only - it says
+    // how much of the clip is genuinely moving, which is worth seeing, but it
+    // is NOT what the slice is taken from. Walking the shoulders on Attack1
+    // gives 61 keys, and 61 keys through the time budgets is 2.03x, which
+    // strobes. How much motion exists and how much of it there is time to
+    // play are different questions.
+    const float SHOULDER = 0.15f;
+    float threshold = peakSpeed * SHOULDER;
+
+    int first = peakFrame;
+    while (first > 0 && speed[first] > threshold)
+        first--;
+
+    int last = peakFrame;
+    while (last < frameCount - 1 && speed[last] > threshold)
+        last++;
+
+    sprintf_s(buffer, "  contact at key %d (%.1f%% in), moving keys %d..%d = %d of %d\n",
+        peakFrame, 100.0f * peakFrame / frameCount, first, last,
+        last + 1 - first, frameCount);
+    OutputDebugStringA(buffer);
+
+    // The slice is not the moving part - it is what the time budgets can
+    // afford, hung around the contact key.
+    //
+    // Each phase gets however many keys it can play at about one per tick,
+    // and they are laid either side of the key the blade lands on. Asking for
+    // the moving part instead is what produced a 61 key slice for Attack1 and
+    // a 2.03x rate; asking what fits produces 33 keys and 1.14x, with contact
+    // on the same key either way.
+    //
+    // A consequence worth knowing: every clip comes out the same width, so
+    // every swing in the game plays at the same rate and lands at the same
+    // moment. The only thing that differs between clips is where the window
+    // sits inside them.
+    const float TARGET_RATE = 1.15f;
+    int windupKeys = (int)(m_SwingWindupTime * 60.0f * TARGET_RATE + 0.5f);
+    int strikeKeys = (int)(m_SwingActiveTime * 60.0f + 0.5f);
+    int recoverKeys = (int)(m_SwingRecoverTime * 60.0f * TARGET_RATE + 0.5f);
+
+    int sliceFirst = peakFrame - windupKeys;
+    int sliceLast = peakFrame + strikeKeys + recoverKeys;
+
+    // Slide it back inside the clip rather than truncating, so the span - and
+    // therefore the playback rate - survives a contact key near either end.
+    if (sliceFirst < 0)
+    {
+        sliceLast -= sliceFirst;
+        sliceFirst = 0;
+    }
+    if (sliceLast > frameCount - 1)
+    {
+        sliceFirst -= (sliceLast - (frameCount - 1));
+        sliceLast = frameCount - 1;
+    }
+    if (sliceFirst < 0)
+        sliceFirst = 0;
+
+    float sliceSpan = (float)(sliceLast - sliceFirst);
+    if (sliceSpan < 1.0f)
+        sliceSpan = 1.0f;
+
+    sprintf_s(buffer, "  slice keys %d..%d = %.0f, contact %.0f%% through it\n",
+        sliceFirst, sliceLast, sliceSpan,
+        100.0f * (peakFrame - sliceFirst) / sliceSpan);
+    OutputDebugStringA(buffer);
+
+    sprintf_s(buffer, "  ROW:  { \"%s\", %.3ff, %.3ff, %.3ff, %.3ff },\n",
+        AnimationName,
+        (float)sliceFirst / (float)frameCount,
+        (float)sliceLast / (float)frameCount,
+        (float)(peakFrame - sliceFirst) / sliceSpan,
+        (float)(peakFrame + strikeKeys - sliceFirst) / sliceSpan);
+    OutputDebugStringA(buffer);
+
+    float rW = (sliceSpan * ((float)(peakFrame - sliceFirst) / sliceSpan))
+             / (m_SwingWindupTime * 60.0f);
+    float rR = (float)(sliceLast - peakFrame - strikeKeys)
+             / (m_SwingRecoverTime * 60.0f);
+    sprintf_s(buffer, "  -> rates %.2f / 1.00 / %.2f  (near 1.0 is smooth, over 2.0 strobes)\n",
+        rW, rR);
+    OutputDebugStringA(buffer);
+}
+
 bool Player::IsParrying() const
 {
     return m_ParryTimer > 0.0f;
@@ -513,40 +941,6 @@ bool Player::TryParry(GameObject* Attacker)
     return true;
 }
 
-// Where the sword is, sampled every frame, so the swing direction can be
-// measured from it. BoneAttachPoint runs at the end of this Update, so what
-// is read here is last frame's pose - consistent frame to frame, which is
-// all a velocity needs.
-void Player::TrackWeaponMotion()
-{
-    if (m_Weapon == nullptr)
-        return;
-
-    // GetMatrx() folds in the parent, so this is a real world position. The
-    // sword's own m_Position is in the model's space and would move by
-    // ~100x as much.
-    XMMATRIX swordWorld = m_Weapon->GetMatrx();
-
-    Vector3 position;
-    XMStoreFloat3((XMFLOAT3*)&position, swordWorld.r[3]);
-
-    if (m_HasWeaponHistory)
-    {
-        Vector3 delta = position - m_PrevWeaponPos;
-
-        // Smoothed, so one noisy frame - or the frame an animation switches
-        // and the hand teleports - cannot throw the arc sideways.
-        m_WeaponVelocity = m_WeaponVelocity * 0.5f + delta * 0.5f;
-    }
-    else
-    {
-        m_WeaponVelocity = Vector3(0.0f, 0.0f, 0.0f);
-        m_HasWeaponHistory = true;
-    }
-
-    m_PrevWeaponPos = position;
-}
-
 // Live tuning for the slash placement, in the same spirit as the weapon
 // socket keys above: swing, nudge, swing again, and press F5 to print the
 // numbers so they can be pasted back into Player.h. Nothing here affects
@@ -556,9 +950,6 @@ void Player::TrackWeaponMotion()
 //   rotation   4 / 5   roll          Y / 0   yaw         F6 / F7 pitch
 //   size       6 / 7   length        F8 / F9 thickness
 //   F5         print the current values
-//   F10        cycles how the swing angle is found:
-//                0 fixed table   1 chest->sword   2 sword velocity
-//   F11        toggles the per-swing [SlashSpawn] log
 void Player::DebugTuneSlash()
 {
     const float dt = 1.0f / 60.0f;
@@ -588,12 +979,6 @@ void Player::DebugTuneSlash()
     if (m_SlashLength < 0.1f)    m_SlashLength = 0.1f;
     if (m_SlashThickness < 0.02f) m_SlashThickness = 0.02f;
 
-    if (Input::GetKeyTrigger(VK_F10))
-        m_SlashAngleMode = (m_SlashAngleMode + 1) % 3;
-
-    if (Input::GetKeyTrigger(VK_F11))
-        m_SlashLogSpawn = !m_SlashLogSpawn;
-
     if (Input::GetKeyTrigger(VK_F5))
     {
         char buffer[256];
@@ -606,32 +991,6 @@ void Player::DebugTuneSlash()
             m_SlashPitchTune, m_SlashYawTune, m_SlashRollTune);
         OutputDebugStringA(buffer);
 
-        const char* modeName =
-            (m_SlashAngleMode == 0) ? "0 TABLE (fixed per combo)" :
-            (m_SlashAngleMode == 1) ? "1 SWORD (chest -> sword)" :
-                                      "2 MOTION (sword velocity)";
-
-        float vx = m_WeaponVelocity.x;
-        float vy = m_WeaponVelocity.y;
-
-        float sx = 0.0f, sy = 0.0f;
-        if (m_Weapon != nullptr)
-        {
-            XMMATRIX swordWorld = m_Weapon->GetMatrx();
-            Vector3 swordPos;
-            XMStoreFloat3((XMFLOAT3*)&swordPos, swordWorld.r[3]);
-            sx = swordPos.x - m_Position.x;
-            sy = swordPos.y - (m_Position.y + m_SlashHeight);
-        }
-
-        sprintf_s(buffer,
-            "[Slash] angle mode %s   (F10 cycles)\n"
-            "        sword  offset(%+.3f, %+.3f) len %.3f -> %+.1f deg\n"
-            "        motion vel   (%+.3f, %+.3f) len %.3f -> %+.1f deg\n",
-            modeName,
-            sx, sy, sqrtf(sx * sx + sy * sy), XMConvertToDegrees(atan2f(sy, sx)),
-            vx, vy, sqrtf(vx * vx + vy * vy), XMConvertToDegrees(atan2f(vy, vx)));
-        OutputDebugStringA(buffer);
     }
 }
 
@@ -678,9 +1037,9 @@ void Player::SpawnSlash()
     {
         int step = m_AttackCombo % 3;
 
-        length = m_SlashLength;
-        thickness = m_SlashThickness;
-        sweep = m_SlashSweep;
+        length = m_SlashLength * m_SlashStepScale[step];
+        thickness = m_SlashThickness * m_SlashStepScale[step];
+        sweep = m_SlashSweep * m_SlashSweepDir[step];
         lifetime = m_SlashLifetime;
         pitch = m_SlashPitch[step];
         yaw = m_SlashYaw[step];
@@ -699,104 +1058,37 @@ void Player::SpawnSlash()
     rotation.x = pitch;
     rotation.y = facing * yaw;
 
-    // Roll, measured off the sword rather than guessed.
+    // Roll: the hand-authored table, not a measurement.
     //
-    // The crescent bulges along its own +X, so pointing that at the blade's
-    // direction of travel lines the arc up with the swing. Only the screen
-    // plane matters here - the play plane is XY - so the depth component is
-    // dropped before taking the angle.
+    // Two measuring modes used to live here - the blade's own direction and
+    // the sword's frame-to-frame velocity - and both were removed because
+    // they read the sword at the moment the hit lands, which is not the
+    // moment the swing looks like anything. Logged over a full combo, the
+    // blade mode gave along -0.787 on step 1 (the sword is behind the
+    // player's back there) and only 0.462 of unit length on step 2 (the rest
+    // of it aimed into the screen, so the on-screen angle was mostly
+    // rounding). Both aimed two of the three arcs backwards. The maths was
+    // correct; the instant it sampled was not.
     //
-    // Nothing needs mirroring in this branch: if the character turns around,
-    // the sword sweeps the other way and the measured direction follows it
-    // on its own.
-    bool measured = false;
-
-    float logAlong = 0.0f;
-    float logUp = 0.0f;
-    float logLocal = 0.0f;
-
-    if (m_SlashAngleMode == 1 && m_Weapon != nullptr)
-    {
-        // Which way the blade points.
-        //
-        // sword.fbx measures X +/-0.126, Y +/-0.045, Z 0.004..1.093 - the
-        // mesh is 4.3x longer down its local Z than anything else, so the
-        // blade runs along local +Z. Row 2 of the world matrix is that axis
-        // in world space, with the socket's rotation and the player's turn
-        // already folded in.
-        XMMATRIX swordWorld = m_Weapon->GetMatrx();
-
-        XMFLOAT3 blade;
-        XMStoreFloat3(&blade, XMVector3Normalize(swordWorld.r[2]));
-
-        // Into the character's own frame, so one set of numbers describes a
-        // swing whichever way he is turned. Without this a blade pointing at
-        // world -X means "out in front" facing left and "wound up behind"
-        // facing right, and those want opposite arcs.
-        float along = blade.x * facing;  // + = pointing in front
-        float up = blade.y;
-
-        logAlong = along;
-        logUp = up;
-
-        // Only fails when the blade is aimed almost straight into the screen,
-        // where there is no on-screen direction to take.
-        if (sqrtf(along * along + up * up) > m_SlashBladeMin)
-        {
-            float local = atan2f(up, along) + m_SlashRollTune;
-            logLocal = local;
-
-            // Facing left is a mirror, and for this crescent - symmetric
-            // about its own horizontal axis - that mirror is (PI - angle).
-            rotation.z = (facing > 0.0f) ? local : (XM_PI - local);
-            measured = true;
-        }
-    }
-    else if (m_SlashAngleMode == 2)
-    {
-        float vx = m_WeaponVelocity.x;
-        float vy = m_WeaponVelocity.y;
-
-        if (sqrtf(vx * vx + vy * vy) > m_SlashMotionMin)
-        {
-            rotation.z = atan2f(vy, vx) + m_SlashRollTune;
-            measured = true;
-        }
-    }
-
-    if (!measured)
-    {
-        // Fallback: the fixed per-combo angle. The crescent is drawn already
-        // bulging right, so facing right needs no base turn; facing left is
-        // (PI - roll), which mirrors it, because the arc is symmetric about
-        // its own horizontal axis. A negative X scale would be the obvious
-        // mirror and is wrong here - back-face culling would swallow it.
-        rotation.z = (facing > 0.0f) ? roll : (XM_PI - roll);
-    }
+    // The crescent is drawn already bulging right, so facing right needs no
+    // base turn. Facing left is (PI - roll), which mirrors it, because the
+    // arc is symmetric about its own horizontal axis. A negative X scale
+    // would be the obvious mirror and is wrong here - back-face culling
+    // would swallow it.
+    rotation.z = (facing > 0.0f) ? roll : (XM_PI - roll);
 
     Vector3 slashScale(length, thickness, 1.0f);
 
     // The sweep flips with the facing too, so the blade always travels the
     // way the character is swinging rather than back into them.
-    if (m_SlashLogSpawn)
-    {
-        char buffer[256];
-        sprintf_s(buffer,
-            "[SlashSpawn] combo %d  facing %s  mode %d  %s\n"
-            "             blade along %+.3f  up %+.3f  len %.3f"
-            "  local %+7.1f deg  -> roll %+7.1f deg\n",
-            m_SpecialAttacking ? -1 : (m_AttackCombo % 3),
-            (facing > 0.0f) ? "RIGHT" : "LEFT ",
-            m_SlashAngleMode,
-            measured ? "measured" : "FELL BACK to the table",
-            logAlong, logUp, sqrtf(logAlong * logAlong + logUp * logUp),
-            XMConvertToDegrees(logLocal),
-            XMConvertToDegrees(rotation.z));
-        OutputDebugStringA(buffer);
-    }
+    SlashEffect* slash = Manager::AddGameObj<SlashEffect>();
+    slash->Play(position, rotation, slashScale, lifetime, 1.0f, facing * sweep);
 
-    Manager::AddGameObj<SlashEffect>()->Play(position, rotation, slashScale,
-        lifetime, 1.0f, facing * sweep);
+    // Riding the blade overrides the position and the roll set above; the
+    // pitch and yaw from the table survive, which is what keeps the arc
+    // tilted into the scene rather than flat against the camera.
+    if (m_SlashFollowsSword && m_Weapon != nullptr)
+        slash->FollowWeapon(m_Weapon, m_SlashFollowReach, m_SlashDepth);
 }
 
 void Player::StartAttack()
@@ -806,6 +1098,7 @@ void Player::StartAttack()
     // the sword was still behind the player's back.
     m_AttackHitDone = false;
     m_AttackHitFrames = 0;
+    m_AttackFrame = 0.0f;
     m_SpecialAttacking = false;
 
     // A step into the swing. Movement is locked while attacking, so the
@@ -833,7 +1126,26 @@ void Player::StartAttack()
     SetAnimation(attackAnim);
     m_AttackAnimLength = m_AnimationModel->GetAnimationFrameCount(attackAnim);
 
-    m_Blend = 0.7f; // skip the idle/run¨attack crossfade so the pose is
+    // Rates first, then put the clock on the slice's first key. SetAnimation
+    // only zeroes the frame when the clip NAME changes, so replaying the same
+    // attack twice in a row used to carry the previous swing's frame in with
+    // it - setting it here covers that too.
+    SetupSwingClock(attackAnim);
+    m_AttackFrame = m_AttackClipFirst;
+    m_NextAnimationFrame = (int)m_AttackFrame;
+
+    // A real crossfade, not the old near-snap.
+    //
+    // 0.7 was right while every swing started at key 0, which for these clips
+    // is the character standing in neutral - blending into a pose it was
+    // already in has nothing to hide, so snapping cost nothing. The slice now
+    // starts at the COCKED pose (key 34 of Attack1: arm up and back), and
+    // snapping into that in three ticks is a visible pop.
+    //
+    // 0.3 gives seven ticks at +0.1 a tick. The windup is thirteen, so the
+    // blend finishes inside it and reads as the arm whipping up into the
+    // swing rather than teleporting there.
+    m_Blend = 0.3f; // skip the idle/run¨attack crossfade so the pose is
     // always the pure attack animation from frame 0,
     // matching exactly what was tuned - consistent
     // regardless of what animation played before it.
@@ -852,6 +1164,7 @@ void Player::StartCounterAttack()
 {
     m_AttackHitDone = false;
     m_AttackHitFrames = 0;
+    m_AttackFrame = 0.0f;
     m_SpecialAttacking = true;
     m_ParryTimer = m_ParryTime; // the deflect is live from the first frame
     m_AttackQueued = false;     // a press buffered before this must not chain out of it
@@ -866,5 +1179,9 @@ void Player::StartCounterAttack()
     SetAnimation("AttackRight");
     m_AttackAnimLength = m_AnimationModel->GetAnimationFrameCount("AttackRight");
 
-    m_Blend = 0.7f;
+    SetupSwingClock("AttackRight");
+    m_AttackFrame = m_AttackClipFirst;
+    m_NextAnimationFrame = (int)m_AttackFrame;
+
+    m_Blend = 0.3f;
 }

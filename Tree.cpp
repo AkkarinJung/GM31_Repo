@@ -63,10 +63,18 @@ void Tree::Init()
     }
 
 
+    m_Shadow = nullptr; // see EnableShadow
+}
+
+void Tree::EnableShadow()
+{
+    if (m_Shadow != nullptr)
+        return;
+
     m_Shadow = Manager::AddGameObj<Shadow>();
     m_Shadow->SetScale({ 20.0f ,20.0f ,20.0f });
-    // Not positioned here - Init runs inside AddGameObj, before the caller
-    // has had a chance to SetPosition this tree. Draw does it instead.
+    // Not positioned here - the caller may not have placed this tree yet.
+    // Tree::Draw does it.
 }
 void Tree::Uninit()
 {
@@ -82,14 +90,6 @@ void Tree::Uninit()
     m_PixelShader->Release();
 
     GameObject::Uninit();
-}
-void Tree::HideShadow()
-{
-    if (m_Shadow != nullptr)
-    {
-        m_Shadow->SetDestory();
-        m_Shadow = nullptr;
-    }
 }
 void  Tree::Update()
 {

@@ -60,6 +60,25 @@ private:
     // the same choice Particle makes.
     bool m_DepthTest = false;
 
+    // Optional: ride the weapon instead of standing where it was spawned.
+    //
+    // A slash spawned once and left there has to guess the swing's angle from
+    // a single instant, and the instant available - the frame the hit lands -
+    // is one where the blade is still behind the player's back on two of the
+    // three combo steps. Tracking it every frame removes the guess entirely:
+    // starting behind him is then correct, because the arc sweeps forward
+    // from there along with the blade.
+    class GameObject* m_Follow = nullptr;
+    float m_FollowReach = 0.6f;  // how far up the blade the arc centres
+    float m_FollowDepth = 0.0f;  // world z nudge, to keep it off the body
+
+    // The last usable roll. A blade pointing almost straight into the screen
+    // has no meaningful on-screen angle, so the arc holds the last one it had
+    // rather than snapping to whatever rounding produced.
+    float m_FollowRoll = 0.0f;
+    bool m_HasFollowRoll = false;
+    const float m_FollowRollMin = 0.25f;
+
 public:
     void Init() override;
     void Uninit() override;
@@ -74,6 +93,10 @@ public:
     // Lifetime is in seconds and the frame sequence is stretched to fill it.
     void Play(const Vector3& Position, const Vector3& Rotation, const Vector3& Scale,
         float Lifetime = 0.14f, float Alpha = 1.0f, float Sweep = 1.1f);
+
+    // Ride the weapon for the rest of this slash's life. Cancels the sweep -
+    // the blade's own movement IS the sweep once this is on.
+    void FollowWeapon(class GameObject* Weapon, float Reach, float Depth);
 
     void SetAdditive(bool Additive) { m_Additive = Additive; }
     void SetDepthTest(bool DepthTest) { m_DepthTest = DepthTest; }

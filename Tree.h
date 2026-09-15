@@ -19,11 +19,16 @@ private:
 	GameObject* m_Shadow;
 
 public:
-	// Init gives every tree a shadow, which is right for one standing next to
-	// the player and wrong for a hundred filling the horizon - the disc is 40
-	// units across and each one is another object. Called after the fact,
-	// because Init is what creates it.
-	void HideShadow();
+	// Trees do not get a shadow unless asked. It used to be the other way
+	// round - Init made one and the caller destroyed it again - and the only
+	// caller there has ever been (Game's BuildTreeLine) threw every one of
+	// them away. That was hundreds of Shadow objects built and torn down per
+	// stage load, each one decoding shadow.png and re-reading both compiled
+	// shaders off disk, for nothing. The maps are wider now, so it was about
+	// to get worse.
+	//
+	// Call this for a tree close enough to the player for a shadow to read.
+	void EnableShadow();
 
 	void Init();
 	void Uninit();

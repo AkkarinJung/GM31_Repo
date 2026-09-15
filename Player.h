@@ -73,8 +73,103 @@ private:
     // like it passed straight through. The weapon only lets a swing damage
     // each enemy once (Weapon::m_HitThisSwing), so widening this cannot
     // multi-hit - it only stops near misses of the clock.
-    const float m_AttackHitPoint = 0.35f;
-    const float m_AttackHitEnd = 0.55f;
+    // Set per swing from SWING_SLICES in Player.cpp - they are fractions of
+    // the SLICE being played, not of the whole clip, and every clip has its
+    // own. Measured, not guessed: see DebugMeasureSwing.
+    float m_AttackHitPoint = 0.35f;
+    float m_AttackHitEnd = 0.55f;
+
+    // The swing runs on its own clock instead of one animation key per game
+    // frame, and the rate through it changes by phase.
+    //
+    // A constant rate is what makes a swing feel weightless: the windup, the
+    // strike and the recovery all take the same time per key, so nothing
+    // accelerates and there is no moment of impact. Easing into the windup
+    // and then snapping through the contact frames is the single cheapest
+    // thing that gives a swing weight, and it costs one float.
+    //
+    // The weight comes from the CONTRAST between these, not from any one of
+    // them being slow. Strike at twice the windup rate is the whole trick.
+    //
+    // Dragging the windup out reads as anticipation but it also delays the
+    // hit, and on a player character that is input lag. Faster windup plus a
+    // much faster strike gets the contrast without costing response.
+    //
+    // WHY THE RATES ARE NO LONGER CONSTANTS. A fixed rate per key means the swing
+    // takes as long as the artist made the clip. The attack clips here are
+    // 137, 133, 181 and 91 keys at 60fps - 2.28s, 2.22s, 3.02s and 1.52s of
+    // authored motion. At the old rates the hitbox opened 0.72s after the
+    // button on Attack1 and 0.97s on Attack3. A Monster Hunter great sword,
+    // the heaviest swing in the genre, lands at 0.60s. A light sword wants
+    // 0.15-0.25s. The swing was not badly tuned, it was tuned in the wrong
+    // unit: keys instead of seconds.
+    //
+    // It also made the combo inconsistent. Attack3 is 32% more keys than
+    // Attack1, so the third hit of the combo was 35% slower than the first
+    // for no reason other than clip length.
+    //
+    // So the timings below are declared in SECONDS and the per-phase rates
+    // are DERIVED from them and the clip's own length, in SetupSwingClock().
+    // Every swing now lands at the same moment regardless of which clip is
+    // playing, and re-timing the combo is a question of what it should feel
+    // like rather than of how many keys an artist happened to export.
+    float m_AttackFrame = 0.0f;
+
+    // What the swing should feel like, in seconds. These are the numbers to
+    // tune - nothing else here.
+    // Budgets set to what the clips actually contain. Attack1's blade is only
+    // travelling for about six keys around contact and its follow-through is
+    // ten - stretching those over 0.14s and 0.34s meant holding poses through
+    // the fastest part of the swing, which with no interpolation between keys
+    // reads as a stutter exactly where the swing should be sharpest.
+    const float m_SwingWindupTime = 0.22f;  // press -> hitbox opens
+    const float m_SwingActiveTime = 0.10f;  // how long it stays dangerous
+    const float m_SwingRecoverTime = 0.18f; // contact -> swing over
+
+    // The usable slice of the clip, as a fraction of it.
+    //
+    // A Mixamo clip settles out of neutral, swings, then returns to neutral.
+    // The return is dead time the game does not want: the blend into Idle/Run
+    // covers that transition already, so playing it just holds the player
+    // still. Cutting the tail is what buys the recovery budget back.
+    //
+    // It matters MORE than it looks, because AnimationModel::Update() indexes
+    // keys directly (f = Frame % numKeys) with no interpolation between them.
+    // A rate of 4 does not play the clip smoothly at 4x, it shows every 4th
+    // key and strobes. The shorter the slice, the lower the rate has to be,
+    // and the smoother the swing actually looks.
+    //
+    // Set per swing from SWING_SLICES in Player.cpp. Measuring Attack1 showed
+    // why these cannot be one global pair: its blade arrives at key 49 of 137
+    // and the whole swing is spent by key 59. The other 78 keys are the
+    // character walking its arm back to neutral, which the blend into
+    // Idle/Run covers anyway. Every clip parks its contact somewhere else.
+    float m_AttackClipStart = 0.00f;
+    float m_AttackClipEnd = 0.80f;
+
+    // Derived per swing from the above - do not set these by hand.
+    float m_AttackClipFirst = 0.0f;
+    float m_AttackClipLast = 0.0f;
+    float m_AttackClipSpan = 1.0f;
+    float m_AttackRateWindup = 1.10f;
+    float m_AttackRateStrike = 2.20f;
+    float m_AttackRateRecover = 1.30f;
+
+    // Looks the clip up in SWING_SLICES, then works out the slice and the
+    // three rates from it.
+    void SetupSwingClock(const char* AnimationName);
+
+    // How far into the swing the player gets control back. Movement used to
+    // be locked for the WHOLE animation, so a three hit combo took the player
+    // out of the fight for the length of three full clips with no way to step
+    // out of anything. Recovery frames are meant to be a commitment, not a
+    // cutscene.
+    const float m_AttackMoveUnlock = 0.62f;
+    const float m_AttackMoveScale = 0.55f;   // and at reduced speed until it ends
+
+    // 0..1 through the current swing; 1 when not attacking.
+    float AttackProgress() const;
+    bool  MovementLocked() const;
     bool m_AttackHitDone = false; // the window has OPENED (vfx + sound spent)
     int m_AttackHitFrames = 0;    // frames of it left to run
 
@@ -135,19 +230,44 @@ private:
     float m_SlashYawTune = 0.0f;
     float m_SlashRollTune = 0.0f;
 
-    // One 3D pose per step of the combo, in radians.
+    // One 3D pose per step of the combo, in radians. Hand-authored, NOT
+    // measured off the sword - see the note above SpawnSlash for why the two
+    // measuring modes were removed.
     //
-    // Roll is the one that has to be there: the arc is drawn bulging straight
-    // DOWN, so it needs a quarter turn (added in SpawnSlash) to bulge the way
-    // the player is facing. Pitch and yaw are what stop it reading as a flat
-    // sticker - they tip the plane of the swing into the scene, so the arc
-    // sweeps through depth rather than across the screen.
-    const float m_SlashPitch[3] = { 0.15f, -0.18f,  0.22f };
-    const float m_SlashYaw[3]   = { 0.28f,  0.38f, -0.32f };
-    const float m_SlashRoll[3]  = { 0.00f, -0.45f,  0.45f };
+    // Roll is the one that has to be there: the crescent bulges along its own
+    // +X, so this is the direction the cut points. Pitch and yaw stop it
+    // reading as a flat sticker - they tip the plane of the swing into the
+    // scene, so the arc sweeps through depth rather than across the screen.
+    //
+    // The three steps are a down-cut, an up-cut coming back the other way,
+    // and a bigger overhead finisher. Keep every roll well inside +/-90 or
+    // the arc starts pointing behind the player.
+    const float m_SlashPitch[3] = {  0.15f, -0.18f,  0.22f };
+    const float m_SlashYaw[3]   = {  0.28f,  0.38f, -0.32f };
+    const float m_SlashRoll[3]  = { -0.35f,  0.40f, -0.60f };
+
+    // Which way the arc travels during its life, per step. Alternating the
+    // sign is what makes a combo read as back-and-forth rather than three
+    // swipes the same way.
+    const float m_SlashSweepDir[3] = { 1.0f, -1.0f, 1.0f };
+
+    // The finisher is bigger than the two that set it up.
+    const float m_SlashStepScale[3] = { 1.0f, 1.0f, 1.35f };
 
     const float m_SlashLifetime = 0.18f; // short: a slash that lingers stops
                                          // reading as a fast one
+
+    // The arc rides the blade instead of standing where it spawned.
+    //
+    // Anchoring it to the player meant the roll had to be guessed from a
+    // single instant, and the only instant available - the frame the hit
+    // lands - has the blade behind his back on two of the three combo steps.
+    // Riding it removes the guess: the arc simply is wherever the sword is,
+    // pointing the way the sword points, for as long as it lives.
+    //
+    // Set false to go back to a fixed arc using the m_SlashRoll table.
+    bool m_SlashFollowsSword = true;
+    float m_SlashFollowReach = 0.55f; // how far up the blade the arc centres
 
     // The special/parry swing gets a bigger, slower, flatter one - it reads
     // as a heavier, more deliberate cut.
@@ -160,62 +280,35 @@ private:
 
     void DebugTuneSlash();
 
-    // Samples where the sword actually is, every frame, so SpawnSlash can
-    // read off which way the blade is travelling.
-    void TrackWeaponMotion();
-
-    // Sword tracking. The direction the blade is MOVING is what the slash
-    // should line up with - not the direction it is pointing, and certainly
-    // not a fixed angle per combo step. Taking it from the motion means the
-    // arc follows whatever the animation actually does, including the swings
-    // whose fixed angles were wrong.
-    Vector3 m_PrevWeaponPos{ 0.0f, 0.0f, 0.0f };
-    Vector3 m_WeaponVelocity{ 0.0f, 0.0f, 0.0f };
-    bool m_HasWeaponHistory = false;
-
-    // How the arc's roll is decided. F10 cycles it live, so all three can be
-    // compared on the same swing without a rebuild.
-    //
-    //   0  TABLE   the fixed per-combo m_SlashRoll values
-    //   1  BLADE   which way the blade is pointing   <- default
-    //   2  MOTION  which way the sword is travelling
-    //
-    // BLADE is the one that works. The crescent bulges along its own +X, and
-    // the blade sticks out along the radius of the swing, so aiming the bulge
-    // down the blade puts the arc exactly where the steel is. It is read
-    // straight out of the sword's world matrix and is a unit vector, so
-    // unlike everything below it never gets short and noisy.
-    //
-    // Two earlier attempts and why they failed, so they are not retried:
-    //
-    //   chest -> grip. GetMatrx() gives the GRIP, which sits in the hand and
-    //   barely leaves the body: measured 0.166 units for the second combo
-    //   step against 1.053 for the third, an 8x swing in what should be a
-    //   steady reference. The blade does the sweeping, not the hand.
-    //
-    //   MOTION. A horizontal swing travels across the character, which in
-    //   this game is world Z - straight into the screen. The play plane is
-    //   XY, so almost nothing survives the projection and the angle comes
-    //   out of rounding error. Kept for the swings where it does work.
-    int m_SlashAngleMode = 1;
-
-    // Below this the source vector is too short to take an angle from, and
-    // the fixed table is used for that swing instead.
-    const float m_SlashMotionMin = 0.01f;
-
-    // The blade direction is a unit vector, so this only rejects the case
-    // where the blade points almost straight into the screen and there is no
-    // meaningful on-screen direction left.
-    const float m_SlashBladeMin = 0.25f;
-
-    // Logs the real numbers every time a slash spawns, which is the only
-    // moment that matters - a key press samples whenever the key was hit,
-    // which is usually not mid-swing. F11 turns it off once it has served
-    // its purpose.
-    bool m_SlashLogSpawn = true;
+    // The roll used to be measurable three ways - a fixed table, the blade's
+    // own direction, and the sword's velocity - switchable at runtime. Both
+    // measured modes are gone. They sampled the sword at the hit frame, which
+    // is a moment when the blade is genuinely still behind the player on two
+    // of the three swings, so they aimed the arc backwards: the blade mode
+    // logged along -0.787 on step 1 and the motion mode logged a roll of
+    // -174 degrees on step 2. The maths was right; the instant was wrong.
 
     //Right attack
     int m_RightAttackMPCost = 15;
+
+    // The MP economy is no longer const. Reward cards move all four of these
+    // (see CommonStat::MaxMP / MPRegen / SpecialCost / ParryReward /
+    // ParryWindow), which they could not do while they were compile-time
+    // constants.
+public:
+    int   GetSpecialMPCost() const { return m_RightAttackMPCost; }
+    void  SetSpecialMPCost(int Cost) { m_RightAttackMPCost = Cost; }
+
+    float GetMPRegenPerSecond() const { return m_MPRegenPerSecond; }
+    void  SetMPRegenPerSecond(float Rate) { m_MPRegenPerSecond = Rate; }
+
+    int   GetParryMPReward() const { return m_ParryMPReward; }
+    void  SetParryMPReward(int Amount) { m_ParryMPReward = Amount; }
+
+    float GetParryTime() const { return m_ParryTime; }
+    void  SetParryTime(float Time) { m_ParryTime = Time; }
+
+private:
 
     // The special attack parries. Its opening frames deflect an incoming
     // enemy attack instead of taking it, so the move is a read on the
@@ -230,9 +323,18 @@ private:
     // Long enough that a fast reaction still covers the strike. The enemy
     // telegraph is ~0.63s, so a 0.35s window expired before the hit whenever
     // the player answered the flash quickly - which is what everyone does.
-    const float m_ParryTime = 0.5f;
-    const int m_ParryMPReward = 10;   // part of the cost back for reading it right
-    const float m_MPRegenPerSecond = 4.0f; // without this the parry runs dry and stops working
+    float m_ParryTime = 0.5f;
+
+    // Reading the telegraph is what pays for the next special, not waiting.
+    //
+    // The refund used to be 10 against a cost of 15, with 4 MP/s trickling in
+    // underneath - which meant a full bar every 12.5s and a special every
+    // 3.75s whether the player parried anything or not. The move was free, so
+    // it was mashed. At 12 back on a 15 cost a successful parry runs at a net
+    // 3 MP, while a whiffed one costs the full 15 and takes over eight
+    // seconds to earn back. Same move, but now it is a read.
+    int m_ParryMPReward = 12;
+    float m_MPRegenPerSecond = 1.8f;
     float m_MPRegenCarry = 0.0f;
     const int m_ParryHitStop = 10;    // a heavier freeze than a normal hit
     const float m_ParryShake = 0.12f;
@@ -270,4 +372,11 @@ public:
     bool IsParrying() const;
 
     void DebugDumpSwing(const char* AnimationName, const char* BoneName);
+
+    // Measures where the actual swing is inside a clip, by walking the clip
+    // and watching how fast the weapon hand moves. The fastest key is the
+    // contact frame; the stretch either side of it where the hand is still
+    // moving is the part worth playing. Prints the m_AttackClipStart /
+    // m_AttackClipEnd / m_AttackHitPoint those imply.
+    void DebugMeasureSwing(const char* AnimationName, const char* BoneName);
 };

@@ -105,30 +105,70 @@ std::vector<AABB> Collision::GatherSolids()
 bool Collision::MoveX(Vector3& Position, const Vector3& HalfSize, float Delta,
     const std::vector<AABB>& Solids)
 {
-    Position.x += Delta;
-
     if (Delta == 0.0f)
         return false;
 
+    // Swept, not "teleport to the destination and then look for an overlap".
+    //
+    // The old version moved the body the whole way first and only then tested,
+    // so it could only stop something whose overlap SURVIVED the entire step.
+    // Anything it stepped clean over in one frame was never seen at all, and
+    // the map edge is the worst case in the game for that: the hedge model
+    // arrives 400 units long and is scaled to 4, which leaves its collider
+    // about 0.3 units thick once the quarter turn swaps its axes. A thin wall
+    // is exactly what a move-then-test sweep misses.
+    //
+    // Worse, a body that ended a step with its centre even slightly past a
+    // thin wall's centre was then pushed the REST of the way through by
+    // PushOutOfSolids, which leaves along whichever side the centre is on.
+    // Finding the first blocking face along the path removes both problems:
+    // the body can never end a frame beyond a solid it should have hit.
+    AABB body = BodyAABB(Position, HalfSize);
+
+    float travel = Delta;
     bool blocked = false;
 
     for (int i = 0; i < (int)Solids.size(); i++)
     {
         const AABB& solid = Solids[i];
-        AABB body = BodyAABB(Position, HalfSize);
 
-        if (!AABBvsAABB(body, solid))
+        // The sweep only matters if the body already lines up with the solid
+        // on the other two axes - otherwise it passes above, below or behind.
+        if (body.MaxY() <= solid.MinY() || body.MinY() >= solid.MaxY())
+            continue;
+        if (body.MaxZ() <= solid.MinZ() || body.MinZ() >= solid.MaxZ())
             continue;
 
-        // Only X moves here. Whatever the body is doing vertically is left
-        // alone, so a crate cannot boost or drop it sideways.
         if (Delta > 0.0f)
-            Position.x = solid.MinX() - HalfSize.x;
-        else
-            Position.x = solid.MaxX() + HalfSize.x;
+        {
+            // Only solids the body has not already reached. One it is already
+            // inside is PushOutOfSolids' job, not this function's - trying to
+            // resolve it here would shove the body backwards mid-step.
+            if (body.MaxX() > solid.MinX())
+                continue;
 
-        blocked = true;
+            float allowed = solid.MinX() - body.MaxX();
+            if (allowed < travel)
+            {
+                travel = allowed;
+                blocked = true;
+            }
+        }
+        else
+        {
+            if (body.MinX() < solid.MaxX())
+                continue;
+
+            float allowed = solid.MaxX() - body.MinX(); // negative
+            if (allowed > travel)
+            {
+                travel = allowed;
+                blocked = true;
+            }
+        }
     }
+
+    Position.x += travel;
 
     return blocked;
 }

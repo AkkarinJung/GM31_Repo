@@ -74,13 +74,15 @@ void Manager::Update()
 
 	// Outside the pause. Pausing stops things THINKING; it was never meant to
 	// keep dead objects alive, and leaving the reaper in there had a real
-	// consequence: Game::Init builds 150 trees, each of which creates a shadow
-	// in its own Init and is then told to drop it again (BuildTreeLine ->
-	// Tree::HideShadow), and the very last thing Init does is start the reward
-	// pick, which pauses. So 150 shadows sat marked-but-alive for the whole
-	// card screen, at the origin because nothing had positioned them, each one
-	// 40 units across - a huge black disc under the player that vanished the
-	// moment a card was picked and the reaper was allowed to run.
+	// consequence: Game::Init used to build a shadow for every one of its
+	// hundreds of trees and immediately mark it for destruction, and the very
+	// last thing Init does is start the reward pick, which pauses. So all of
+	// those shadows sat marked-but-alive for the whole card screen, at the
+	// origin because nothing had positioned them, each one 40 units across - a
+	// huge black disc under the player that vanished the moment a card was
+	// picked and the reaper was allowed to run. Trees no longer make a shadow
+	// they do not want, but the ordering trap here was real and is worth
+	// keeping shut.
 	m_GameObjects.remove_if([](GameObject* object)
 		{
 			return object->Destory();
@@ -138,6 +140,11 @@ void Manager::Draw()
 			});
 	}
 
+	// The scene draws LAST, over every object, and it had never been called
+	// at all - Scene::Draw was declared virtual and overridden in Title, Game
+	// and Result, and none of those overrides ever ran. That is why the menus
+	// had to be built out of Polygon2D objects: there was no way for a scene
+	// to put anything on screen itself.
 	for (int layer = 0; layer < 5; layer++)
 	{
 		for (GameObject* obj : m_GameObjects) {
@@ -150,5 +157,9 @@ void Manager::Draw()
 			}
 		}
 	}
+
+	if (m_Scene != nullptr)
+		m_Scene->Draw();
+
 	Renderer::End();
 }

@@ -93,16 +93,9 @@ private:
     // without turning it into a battering ram.
     const float m_AttackingMass = 8.0f;
 
-    // Shader
-    ID3D11InputLayout* m_VertexLayout = nullptr;
-    ID3D11VertexShader* m_VertexShader = nullptr;
-    ID3D11PixelShader* m_PixelShader = nullptr;
-
-    // Toon ramp texture, sampled at t1 by toonPS
-    ID3D11ShaderResourceView* m_RampTexture = nullptr;
-
-    // x = ramp row, y = edge threshold, z = edge darkening
-    XMFLOAT4 m_Parameter{ 0.125f, -0.35f, 0.3f, 0.15f };
+    // The toon shader and its ramp used to be built here, per enemy. They
+    // live in ToonShader now - the scenery wanted the same look, and a copy
+    // per object would have meant hundreds of them. See ToonShader::Bind.
 
     class ModelRenderer* m_ModelRenderer;
 

@@ -36,9 +36,29 @@ private:
 
     float m_DisplayRatio = 1.0f; // eases toward the real ratio each frame
 
-    float StatRatio() const; // reads whichever stat this bar tracks
+    // The number printed on the bar. A bar alone says "about half"; the
+    // number says how many hits that is, which is what the player is actually
+    // deciding on.
+    //
+    // Deliberately NOT eased like the fill is. The fill slides so a hit reads
+    // as an event, but the digits are information - lagging them by a third
+    // of a second would show a value that is not true any more.
+    bool  m_ShowValue = true;
+    float m_ValueSize = 19.0f;
+
+    // Where the digits sit, relative to this bar's own rectangle. The bar art
+    // is a slanted parallelogram with transparent padding, so the text is
+    // pulled in from the right edge to land on the solid part of it.
+    float m_ValueRightInset = 34.0f;
+    float m_ValueCenterY = 0.5f;   // fraction of the bar's height
+
+    float StatRatio() const;                         // reads whichever stat this bar tracks
+    void  StatValues(int& Value, int& Maximum) const; // and the raw numbers behind it
 
 public:
+    // Off for a bar where the number would be clutter rather than help.
+    void SetShowValue(bool Show) { m_ShowValue = Show; }
+
     void Init() override {}
     void Init(float X, float Y, float Width, float Height, GameObject* Target,
         BarStat Stat, const WCHAR* FillTextureName);

@@ -2,9 +2,26 @@
 #include "renderer.h"
 #include "HPBar.h"
 #include "Stats.h"
+#include "Font.h"
 
 // The one place that reads a stat off the target, so HP and MP bars cannot
 // drift apart the way HPBar and MPBar did.
+void HPBar::StatValues(int& Value, int& Maximum) const
+{
+    Value = 0;
+    Maximum = 0;
+
+    if (m_Target == nullptr)
+        return;
+
+    Stats* stats = m_Target->GetGameComponent<Stats>();
+    if (stats == nullptr)
+        return;
+
+    Value = (m_Stat == BarStat::MP) ? stats->GetMP() : stats->GetHP();
+    Maximum = (m_Stat == BarStat::MP) ? stats->GetMaxMP() : stats->GetMaxHP();
+}
+
 float HPBar::StatRatio() const
 {
     if (m_Target == nullptr)
@@ -208,4 +225,29 @@ void HPBar::Draw()
     Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &m_FillTexture);
     Renderer::GetDeviceContext()->IASetVertexBuffers(0, 1, &m_FillVertexBuffer, &stride, &offset);
     Renderer::GetDeviceContext()->Draw(4, 0);
+
+    // The number goes on last. Font::Draw binds all of its own state, so it
+    // has to come after the quads rather than between them.
+    if (!m_ShowValue)
+        return;
+
+    int value = 0;
+    int maximum = 0;
+    StatValues(value, maximum);
+
+    if (maximum <= 0)
+        return;
+
+    char text[32];
+    sprintf_s(text, "%d / %d", value, maximum);
+
+    float width = Font::Measure(text, m_ValueSize);
+    float x = m_X + m_Width - m_ValueRightInset - width;
+    float y = m_Y + m_Height * m_ValueCenterY - m_ValueSize * 0.5f;
+
+    // A dark pass one pixel down-right first. The bars sit over whatever the
+    // map happens to be behind them, and white digits on a pale background
+    // disappear without it.
+    Font::Draw(text, x + 1.0f, y + 1.0f, m_ValueSize, XMFLOAT4(0.0f, 0.0f, 0.0f, 0.55f));
+    Font::Draw(text, x, y, m_ValueSize, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
 }

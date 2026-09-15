@@ -73,13 +73,15 @@ void Game::ResetProgress()
 	s_Stage = 0;
 	s_RunComplete = false;
 	RoguelikeSystem::ResetRun(); // a new run starts with no rewards carried over
+	Score::ResetRun();           // and with nothing killed yet
 }
 
-// How far the player can walk either way. The stages put enemies between
-// x = -9 and x = 17, so this leaves a margin at both ends rather than ending
-// the map on top of the last fight.
-const float Game::MapLeft = -16.0f;
-const float Game::MapRight = 24.0f;
+// How far the player can walk either way. Set from the stage table at the
+// top of Init(), before anything that reads them is built - each stage is a
+// different size, and they run from 60 units across up to 128. The values
+// here are only what a Game object starts life with.
+float Game::MapLeft = -20.0f;
+float Game::MapRight = 40.0f;
 
 // The player is pinned to z = 0 and only ever moves in x and y, so two walls
 // is the whole boundary. These run along z purely so they fill the screen -
@@ -212,16 +214,21 @@ static const float TREE_OVERHANG = 45.0f;
 
 struct TreeBand
 {
-	int Count;
+	float Density;            // trees per unit of x, NOT a fixed count
 	float NearZ, FarZ;
 	float MinHeight, MaxHeight;
 };
 
+// Density rather than a count, because the stages are no longer all the same
+// width. A fixed 60 spread over the 128 unit stage 5 would be half as dense
+// as the same 60 over stage 1, and the horizon would visibly thin out as the
+// run went on. These are the old counts divided by the old span (130 units
+// including the overhang), so stage 1 looks exactly as it always did.
 static const TreeBand s_TreeBands[] =
 {
-	{ 60, 18.0f, 34.0f, 4.5f, 7.0f },
+	{ 0.46f, 18.0f, 34.0f, 4.5f, 7.0f },
 	// Smaller and denser, so the horizon sits behind the row in front of it.
-	{ 90, 36.0f, 72.0f, 3.5f, 5.5f },
+	{ 0.69f, 36.0f, 72.0f, 3.5f, 5.5f },
 };
 
 static void BuildTreeLine()
@@ -229,11 +236,15 @@ static void BuildTreeLine()
 	const float startX = Game::MapLeft - TREE_OVERHANG;
 	const float endX = Game::MapRight + TREE_OVERHANG;
 
+	const int spanCount = (int)(endX - startX);
+
 	for (int b = 0; b < COUNT_OF(s_TreeBands); b++)
 	{
 		const TreeBand& band = s_TreeBands[b];
 
-		for (int i = 0; i < band.Count; i++)
+		int count = (int)(spanCount * band.Density);
+
+		for (int i = 0; i < count; i++)
 		{
 			float height = SceneryRandomRange(band.MinHeight, band.MaxHeight);
 
@@ -244,8 +255,9 @@ static void BuildTreeLine()
 			tree->SetScale({ height * TREE_IMAGE_ASPECT / TREE_QUAD_WIDTH,
 				height / TREE_QUAD_HEIGHT, 1.0f });
 
-			// Nothing this far back casts a shadow worth drawing.
-			tree->HideShadow();
+			// No EnableShadow: nothing this far back casts a shadow worth
+			// drawing, and at these counts building one per tree only to
+			// throw it away cost hundreds of file reads per stage load.
 		}
 	}
 }
@@ -291,7 +303,14 @@ static void BuildScenery()
 
 void Game::Init()
 {
-	
+	// Everything that makes this stage different from the next comes out of
+	// the stage table - see Stage.cpp. Read FIRST, because the map bounds
+	// decide where the walls go, how far the tree line and the scenery run,
+	// and where the camera stops - all of which are built below.
+	const StageData& stage = GetStageData(s_Stage);
+
+	MapLeft = stage.Left;
+	MapRight = stage.Right;
 
 	Manager::AddGameObj<Camera>();
 	//Manager::AddGameObj<field>();
@@ -303,10 +322,6 @@ void Game::Init()
 	BuildMapEdge();
 	BuildScenery();
 	BuildTreeLine();
-
-	// Everything that makes this stage different from the next comes out of
-	// the stage table - see Stage.cpp.
-	const StageData& stage = GetStageData(s_Stage);
 
 	for (int i = 0; i < stage.EnemyCount; i++)
 	{

@@ -522,6 +522,39 @@
 		}
 	}
 
+	void AnimationModel::DebugPrintAnimationInfo() const
+	{
+		char buffer[256];
+		OutputDebugStringA("=== animation clips ===\n");
+		OutputDebugStringA("  name            keys   file fps   authored   at 60fps   speed\n");
+
+		for (const auto& pair : m_Animation)
+		{
+			if (pair.second == nullptr || !pair.second->HasAnimations())
+				continue;
+
+			aiAnimation* animation = pair.second->mAnimations[0];
+			if (animation->mNumChannels == 0)
+				continue;
+
+			int keys = (int)animation->mChannels[0]->mNumPositionKeys;
+			double fps = animation->mTicksPerSecond;
+			if (fps <= 0.0)
+				fps = 25.0; // what assimp falls back to when the file says nothing
+
+			double authored = animation->mDuration / fps;
+			double played = keys / 60.0;
+
+			sprintf_s(buffer, "  %-14s %5d   %8.1f   %7.2fs   %7.2fs   %.2fx\n",
+				pair.first.c_str(), keys, fps, authored, played,
+				(played > 0.0001) ? (authored / played) : 0.0);
+			OutputDebugStringA(buffer);
+		}
+
+		OutputDebugStringA("  (speed 1.00x = plays as authored; 2.00x = the file is\n"
+		                   "   half the speed the game shows it at)\n");
+	}
+
 	int AnimationModel::GetAnimationFrameCount(const std::string& AnimationName) const
 	{
 		auto it = m_Animation.find(AnimationName);

@@ -35,8 +35,11 @@ public:
 	// and Camera stops short of them - walk the camera all the way to the
 	// edge and the near end of a hedge lands inside the near plane, which is
 	// what lets you see through it.
-	static const float MapLeft;
-	static const float MapRight;
+	//
+	// Set from the stage table at the top of Init(), not fixed: every stage
+	// is a different size. Anything that reads them runs after that.
+	static float MapLeft;
+	static float MapRight;
 
 	static int GetStageIndex() { return s_Stage; }
 	static bool IsRunComplete() { return s_RunComplete; }
