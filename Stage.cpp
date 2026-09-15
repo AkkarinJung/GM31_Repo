@@ -48,9 +48,13 @@
 //  * Nothing sits within four units of x = 0, the same rule the enemies
 //    follow - the player should not start the stage inside the scenery.
 //
-// The count grows with the stage, from four to ten. HP carries between stages
-// now (see Game::s_CarriedHP), so the later maps need more places to top it
-// back up than the early ones do.
+// One crate on the opening stage and two on every stage after it. They are
+// meant to be a find rather than a supply line: with the 33/33/34 table in
+// Crate::Break, nine crates across a run come out at roughly three health
+// potions and three mana potions, and a stage can quite legitimately give
+// nothing at all. HP carries between stages (see Game::s_CarriedHP), so that
+// scarcity is the point - a potion matters because the next one is not
+// around the corner.
 
 // ---------------------------------------------------------------- STAGE 1
 // Flat and open, one crate. Teaches the swing and the jump with nothing else
@@ -70,10 +74,7 @@ static const BoxSpawn s_Stage1Boxes[] =
 
 static const CrateSpawn s_Stage1Crates[] =
 {
-    { {  -6.0f, 0.0f, 0.0f } },
-    { {   4.0f, 0.0f, 0.0f } },
-    { {  16.5f, 0.0f, 0.0f } },
-    { {  30.5f, 0.0f, 0.0f } },
+    { {  16.5f, 0.0f, 0.0f } }, // past the first enemy, before the second
 };
 
 // ---------------------------------------------------------------- STAGE 2
@@ -98,11 +99,8 @@ static const BoxSpawn s_Stage2Boxes[] =
 
 static const CrateSpawn s_Stage2Crates[] =
 {
-    { { -12.0f, 0.0f, 0.0f } },
-    { {   4.0f, 0.0f, 0.0f } },
     { {  14.5f, 0.0f, 0.0f } },
     { {  32.0f, 0.0f, 0.0f } },
-    { {  46.0f, 0.0f, 0.0f } },
 };
 
 // ---------------------------------------------------------------- STAGE 3
@@ -129,12 +127,8 @@ static const BoxSpawn s_Stage3Boxes[] =
 
 static const CrateSpawn s_Stage3Crates[] =
 {
-    { { -24.0f, 0.0f, 0.0f } },
-    { {  -7.0f, 0.0f, 0.0f } },
     { {  11.5f, 0.0f, 0.0f } }, // the gap between the block and the tall
-    { {  23.5f, 0.0f, 0.0f } },
     { {  45.0f, 0.0f, 0.0f } },
-    { {  54.5f, 0.0f, 0.0f } },
 };
 
 // ---------------------------------------------------------------- STAGE 4
@@ -166,14 +160,8 @@ static const BoxSpawn s_Stage4Boxes[] =
 
 static const CrateSpawn s_Stage4Crates[] =
 {
-    { { -28.0f, 0.0f, 0.0f } },
-    { { -11.0f, 0.0f, 0.0f } },
     { {   8.5f, 0.0f, 0.0f } },
-    { {  20.0f, 0.0f, 0.0f } },
-    { {  32.0f, 0.0f, 0.0f } },
-    { {  36.0f, 0.0f, 0.0f } }, // pairs with the one above, either side of the enemy at 34
     { {  45.0f, 0.0f, 0.0f } },
-    { {  61.0f, 0.0f, 0.0f } },
 };
 
 // ---------------------------------------------------------------- STAGE 5
@@ -210,16 +198,8 @@ static const BoxSpawn s_Stage5Boxes[] =
 
 static const CrateSpawn s_Stage5Crates[] =
 {
-    { { -34.0f, 0.0f, 0.0f } },
-    { { -17.0f, 0.0f, 0.0f } },
-    { { -11.0f, 0.0f, 0.0f } },
     { {  12.5f, 0.0f, 0.0f } },
-    { {  23.0f, 0.0f, 0.0f } },
-    { {  38.0f, 0.0f, 0.0f } },
-    { {  42.0f, 0.0f, 0.0f } },
     { {  66.0f, 0.0f, 0.0f } },
-    { {  82.0f, 0.0f, 0.0f } },
-    { {  90.0f, 0.0f, 0.0f } },
 };
 
 // The run, in order. Add a stage by adding a line here - Game::Update reads

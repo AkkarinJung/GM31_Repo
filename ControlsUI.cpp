@@ -26,6 +26,10 @@ static const InputSprite KEY_TAB   = { 19, 5, 2 }; // 2 tiles wide
 static const InputSprite KEY_SHIFT = { 17, 7, 2 }; // 2 tiles wide
 static const InputSprite KEY_F1    = { 18, 0, 1 };
 static const InputSprite KEY_I     = { 24, 2, 1 }; // the sheet is a QWERTY layout
+// Row 1 of the sheet is the number row, starting at column 17 - the same
+// way row 2 starts at Q and row 3 at A.
+static const InputSprite KEY_1     = { 17, 1, 1 };
+static const InputSprite KEY_2     = { 18, 1, 1 };
 static const InputSprite MOUSE_LEFT  = {  9, 2, 1 };
 static const InputSprite MOUSE_RIGHT = { 10, 2, 1 };
 
@@ -44,6 +48,7 @@ static const ControlEntry s_Controls[] =
     { KEY_SPACE,   KEY_NONE,  "Jump" },
     { MOUSE_LEFT,  KEY_NONE,  "Attack" },
     { MOUSE_RIGHT, KEY_NONE,  "Special  -15 MP  parries" },
+    { KEY_1,       KEY_2,     "Drink potion slot 1 / 2" },
     { KEY_I,       KEY_NONE,  "Stats" },
     { KEY_F1,      KEY_NONE,  "Debug camera" },
     { KEY_ESC,     KEY_NONE,  "Quit" },

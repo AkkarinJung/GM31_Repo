@@ -49,7 +49,7 @@ static const SoundDef s_Sounds[] =
     { SE::CardHover,     "asset\\Audio\\SFX\\Card_Hover.wav",         0.35f, ""                            },
     { SE::CardSelect,    "asset\\Audio\\SFX\\Select_Card.wav",        0.70f, "asset\\Audio\\pause.wav"     },
 
-    { SE::StageClear,    "asset\\Audio\\SFX\\Stage_Clear.wav",        0.80f, "asset\\Audio\\gameclear.wav" },
+    { SE::StageClear,    "asset\\Audio\\SFX\\Stage_clear.wav",        0.80f, "asset\\Audio\\gameclear.wav" },
 
     // The crate break ships as a loose wav rather than under SFX, so it is
     // named where it actually is instead of being moved.
@@ -58,6 +58,10 @@ static const SoundDef s_Sounds[] =
     // bright, which is the right shape for it, so it stands in until there
     // is one - the same way SpecialAttack borrows the third combo swing.
     { SE::PotionPickup,  "asset\\Audio\\SFX\\Potion_Pickup.wav",       0.65f, "asset\\Audio\\SFX\\Select_Card.wav" },
+    // Picking one up and drinking it are different moments now, so they get
+    // different clips. Neither file exists yet; both fall back to something
+    // in the right register until they do.
+    { SE::PotionDrink,   "asset\\Audio\\SFX\\Potion_Drink.wav",        0.75f, "asset\\Audio\\SFX\\Select_Card.wav" },
 };
 
 static const int s_SoundCount = sizeof(s_Sounds) / sizeof(s_Sounds[0]);

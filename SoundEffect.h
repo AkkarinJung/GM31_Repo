@@ -42,7 +42,8 @@ enum class SE
     StageClear,
 
     CrateBreak,     // a breakable crate bursts
-    PotionPickup,   // what fell out of it is collected
+    PotionPickup,   // what fell out of it goes into a slot
+    PotionDrink,    // and is spent out of that slot
 
     Count           // keep last
 };

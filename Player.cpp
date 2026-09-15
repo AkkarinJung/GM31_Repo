@@ -16,6 +16,7 @@
 #include "MeshField.h"
 
 #include "Stats.h"
+#include "PotionBag.h"
 
 #include "BoneAttachPoint.h"
 #include "Sword.h"
@@ -246,6 +247,21 @@ void Player::Update()
     if (Input::GetKeyTrigger('1') && m_Attacking) { m_AttackFrame = m_AttackClipFirst; m_NextAnimationFrame = (int)m_AttackFrame; m_Blend = 1.0f; }
     if (Input::GetKeyTrigger('2') && m_Attacking) { m_AttackFrame = m_AttackClipFirst + m_AttackClipSpan * 0.5f; m_NextAnimationFrame = (int)m_AttackFrame; m_Blend = 1.0f; }
     if (Input::GetKeyTrigger('3') && m_Attacking) { m_AttackFrame = m_AttackClipLast - 1.0f; m_NextAnimationFrame = (int)m_AttackFrame; m_Blend = 1.0f; }
+
+    // Drink from a potion slot. 1 and 2 are the debug scrub above while a
+    // swing is playing, so this takes the other half of that condition
+    // rather than a key of its own: the two can never both fire on one
+    // press, whatever else changes around them. It also means a swing
+    // cannot be cancelled into a heal, which is the right way round - you
+    // commit to the attack.
+    if (!m_Attacking)
+    {
+        for (int slot = 0; slot < PotionBag::SlotCount; slot++)
+        {
+            if (Input::GetKeyTrigger((BYTE)('1' + slot)))
+                PotionBag::Use(slot, this);
+        }
+    }
 
     if (Input::GetKeyTrigger(VK_F2))
         m_FreezeAnimation = !m_FreezeAnimation;

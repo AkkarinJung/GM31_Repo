@@ -8,16 +8,11 @@
 #include "Collision.h"
 #include "MeshField.h"
 #include "Player.h"
-#include "Stats.h"
-#include "DamageNumber.h"
+#include "PotionBag.h"
 #include "SoundEffect.h"
 
-// What a potion is worth, as a FRACTION of the bar it fills rather than a
-// flat number. Max HP and Max MP are both reward cards - a Legendary Max HP
-// roll alone is +72 - so a flat "heals 30" would start as a third of the bar
-// and end the run as a rounding error.
-static const float HEALTH_POTION_RATIO = 0.30f;
-static const float MANA_POTION_RATIO = 0.40f;
+// What a potion restores lives in PotionBag now, with the code that spends
+// it - this object only has to get itself picked up.
 
 // Both models are about 0.22 x 0.28 x 0.19 in their own space, so this puts
 // a potion at roughly half a unit tall - readable on the floor next to a
@@ -47,9 +42,6 @@ static const float PICKUP_DELAY = 0.25f;
 static const float BOB_HEIGHT = 0.12f;
 static const float BOB_SPEED = 3.0f;
 static const float SPIN_SPEED = 1.8f; // radians per second
-
-static const XMFLOAT4 HEALTH_COLOUR = XMFLOAT4(0.35f, 1.0f, 0.40f, 1.0f);
-static const XMFLOAT4 MANA_COLOUR = XMFLOAT4(0.40f, 0.65f, 1.0f, 1.0f);
 
 void Potion::Init()
 {
@@ -144,11 +136,6 @@ void Potion::TryCollect()
     if (player == nullptr)
         return;
 
-    Stats* stats = player->GetGameComponent<Stats>();
-
-    if (stats == nullptr)
-        return;
-
     // 2.5D, like every other reach test here: horizontal distance against
     // one limit, height against another. Measuring a single 3D distance
     // would make a potion harder to pick up while jumping, for no reason a
@@ -164,38 +151,17 @@ void Potion::TryCollect()
     if (dy > PICKUP_HEIGHT || dy < -PICKUP_HEIGHT)
         return;
 
-    int amount;
-
-    if (m_Type == PotionType::Health)
-    {
-        amount = (int)(stats->GetMaxHP() * HEALTH_POTION_RATIO + 0.5f);
-        if (amount < 1)
-            amount = 1;
-
-        stats->Heal(amount);
-    }
-    else
-    {
-        amount = (int)(stats->GetMaxMP() * MANA_POTION_RATIO + 0.5f);
-        if (amount < 1)
-            amount = 1;
-
-        stats->RestoreMP(amount);
-    }
+    // Into the bag, not into the player. A full bag means this potion stays
+    // exactly where it is - no sound, no popup, nothing consumed - so the
+    // player can clear a slot and come back for it. Returning here rather
+    // than setting m_Collected is what lets that retry happen: the test runs
+    // again next frame.
+    if (!PotionBag::TryStore(m_Type))
+        return;
 
     m_Collected = true;
 
     SoundEffect::Play(SE::PotionPickup);
-
-    // Above the player's head rather than over the potion, so the number
-    // reads as something that happened to the player. ShowSign, so a heal
-    // cannot be mistaken for the damage numbers the enemies throw.
-    Vector3 popupPos = player->GetPosition();
-    popupPos.y += 2.2f;
-
-    DamageNumber* popup = Manager::AddGameObj<DamageNumber>();
-    popup->Init(popupPos, amount, true,
-        m_Type == PotionType::Health ? HEALTH_COLOUR : MANA_COLOUR);
 
     SetDestory();
 }

@@ -31,6 +31,9 @@
 #include "Hedge.h"
 #include "Prop.h"
 
+#include "PotionBag.h"
+#include "PotionSlotUI.h"
+
 #include "StageUI.h"
 #include "EnemyHPBar.h"
 #include "Stage.h"
@@ -76,6 +79,7 @@ void Game::ResetProgress()
 	s_Stage = 0;
 	s_RunComplete = false;
 	s_CarriedHP = NoCarriedHP; // a new run starts at full HP
+	PotionBag::ResetRun();     // and with nothing in the slots
 	RoguelikeSystem::ResetRun(); // a new run starts with no rewards carried over
 	Score::ResetRun();           // and with nothing killed yet
 }
@@ -391,6 +395,7 @@ void Game::Init()
 	Manager::AddGameObj<Score>()->SetPosition({ 100.0f,100.0f,0.0f });
 	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, BarStat::HP, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
 	Manager::AddGameObj<HPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, BarStat::MP, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
+	Manager::AddGameObj<PotionSlotUI>();
 	Manager::AddGameObj<ControlsUI>();
 	Manager::AddGameObj<StatsUI>();
 	Manager::AddGameObj<StageUI>();

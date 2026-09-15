@@ -18,6 +18,11 @@ enum class PotionType
 // in place until the player walks into it. There is no timer: a potion the
 // player has not reached yet is still theirs, and the scene is rebuilt
 // between stages anyway, so nothing leaks from one map into the next.
+//
+// Walking into it STORES it in PotionBag rather than drinking it - the
+// player chooses when to spend it. If both slots are full the potion is
+// left exactly where it is, so coming back for it after drinking one always
+// works.
 class Potion : public GameObject
 {
 private:
@@ -36,7 +41,7 @@ private:
     // the crate bursts and the bar simply moves.
     float m_PickupDelay = 0.0f;
 
-    bool m_Collected = false; // so one frame cannot apply the potion twice
+    bool m_Collected = false; // so one frame cannot store the potion twice
 
     void TryCollect();
 
