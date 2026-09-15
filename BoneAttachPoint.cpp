@@ -88,35 +88,6 @@ void BoneAttachPoint::Update()
     m_Attached->SetRotation(EulerFromQuaternion(rotQuat));
     m_Attached->SetScale(scaleVec);
 }
-
-void BoneAttachPoint::DebugPrintTransform() const
-{
-    char buffer[256];
-
-    sprintf_s(buffer,
-        "[Socket] offset pos(%.4f, %.4f, %.4f) rot(%.4f, %.4f, %.4f) scale(%.4f, %.4f, %.4f)\n",
-        m_LocalPosition.x, m_LocalPosition.y, m_LocalPosition.z,
-        m_LocalRotation.x, m_LocalRotation.y, m_LocalRotation.z,
-        m_LocalScale.x, m_LocalScale.y, m_LocalScale.z);
-    OutputDebugStringA(buffer);
-
-    if (m_Attached != nullptr)
-    {
-        Vector3 pos = m_Attached->GetPosition();
-        Vector3 rot = m_Attached->GetRotation();
-        Vector3 scale = m_Attached->GetScale();
-
-        sprintf_s(buffer,
-            "[Sword] applied pos(%.4f, %.4f, %.4f) rot(%.4f, %.4f, %.4f) scale(%.4f, %.4f, %.4f)\n",
-            pos.x, pos.y, pos.z, rot.x, rot.y, rot.z, scale.x, scale.y, scale.z);
-        OutputDebugStringA(buffer);
-    }
-    else
-    {
-        OutputDebugStringA("[Sword] nothing attached\n");
-    }
-}
-
 void BoneAttachPoint::AdjustLocalPosition(const Vector3& Delta)
 {
     m_LocalPosition += Delta;

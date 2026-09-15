@@ -52,6 +52,41 @@ protected:
 
     void MarkHit(GameObject* Target) { m_HitThisSwing.push_back(Target); }
 
+    // ---- where this frame's hits landed ---------------------------------
+    //
+    // PURELY for the wielder's impact VFX. Nothing in any damage path reads
+    // any of this, so it can be moved, offset or dropped entirely without
+    // changing what a swing hits - which is the whole point of keeping it
+    // here rather than letting the effect work out its own position by
+    // re-running the reach test.
+    //
+    // Refilled every frame of the active window, not once per swing: the
+    // wielder spawns a burst on the frame a target is first damaged, and a
+    // per-swing list would make it re-spawn one for every earlier target on
+    // every later frame.
+    //
+    // A fixed array rather than a vector because this is rewritten sixty
+    // times a second. A swing landing on more targets than this still damages
+    // all of them - it just stops recording positions, so the extra ones get
+    // no burst.
+    static const int FRAME_HIT_MAX = 8;
+
+    Vector3 m_FrameHitPoint[FRAME_HIT_MAX];
+    Vector3 m_FrameHitDirection[FRAME_HIT_MAX];
+    int m_FrameHitCount = 0;
+
+    void ClearFrameHits() { m_FrameHitCount = 0; }
+
+    void RecordFrameHit(const Vector3& Point, const Vector3& Direction)
+    {
+        if (m_FrameHitCount >= FRAME_HIT_MAX)
+            return;
+
+        m_FrameHitPoint[m_FrameHitCount] = Point;
+        m_FrameHitDirection[m_FrameHitCount] = Direction;
+        m_FrameHitCount++;
+    }
+
     ID3D11InputLayout* m_VertexLayout = nullptr;
     ID3D11VertexShader* m_VertexShader = nullptr;
     ID3D11PixelShader* m_PixelShader = nullptr;
@@ -86,6 +121,7 @@ public:
         m_HitThisSwing.clear();
         m_SwingRolled = false;
         m_CooldownTimer = m_Cooldown;
+        ClearFrameHits();
     }
 
     // Fire / swing. Returns true when it hit something it had not already hit
@@ -113,4 +149,19 @@ public:
     float GetSwingMultiplier() const { return m_SwingMultiplier; }
     void SetSwingMultiplier(float SwingMultiplier) { m_SwingMultiplier = SwingMultiplier; }
     bool CanUse() const { return m_CooldownTimer <= 0.0f; }
+
+    // What the last Use() landed on, for the wielder to put impact VFX on.
+    // Valid only for the frame Use() was called in - read it immediately
+    // after a Use() that returned true.
+    int GetFrameHitCount() const { return m_FrameHitCount; }
+
+    const Vector3& GetFrameHitPoint(int Index) const
+    {
+        return m_FrameHitPoint[(Index < 0 || Index >= m_FrameHitCount) ? 0 : Index];
+    }
+
+    const Vector3& GetFrameHitDirection(int Index) const
+    {
+        return m_FrameHitDirection[(Index < 0 || Index >= m_FrameHitCount) ? 0 : Index];
+    }
 };

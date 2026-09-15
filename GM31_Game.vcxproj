@@ -41,6 +41,7 @@
     <ClCompile Include="Grass.cpp" />
     <ClCompile Include="Hedge.cpp" />
     <ClCompile Include="HPBar.cpp" />
+    <ClCompile Include="ImpactEffect.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="Loading.cpp" />
     <ClCompile Include="main.cpp" />
@@ -62,12 +63,14 @@
     <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
     <ClCompile Include="SkyDome.cpp" />
+    <ClCompile Include="SlashArc.cpp" />
     <ClCompile Include="SlashEffect.cpp" />
     <ClCompile Include="SoundEffect.cpp" />
     <ClCompile Include="Stage.cpp" />
     <ClCompile Include="StageUI.cpp" />
     <ClCompile Include="StatsUI.cpp" />
     <ClCompile Include="Sword.cpp" />
+    <ClCompile Include="SwordTrail.cpp" />
     <ClCompile Include="Title.cpp" />
     <ClCompile Include="ToonShader.cpp" />
     <ClCompile Include="Tree.cpp" />
@@ -99,6 +102,7 @@
     <ClInclude Include="Grass.h" />
     <ClInclude Include="Hedge.h" />
     <ClInclude Include="HPBar.h" />
+    <ClInclude Include="ImpactEffect.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="Loading.h" />
     <ClInclude Include="main.h" />
@@ -122,6 +126,7 @@
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="SkyDome.h" />
+    <ClInclude Include="SlashArc.h" />
     <ClInclude Include="SlashEffect.h" />
     <ClInclude Include="SoundEffect.h" />
     <ClInclude Include="Stage.h" />
@@ -129,6 +134,7 @@
     <ClInclude Include="Stats.h" />
     <ClInclude Include="StatsUI.h" />
     <ClInclude Include="Sword.h" />
+    <ClInclude Include="SwordTrail.h" />
     <ClInclude Include="Title.h" />
     <ClInclude Include="ToonShader.h" />
     <ClInclude Include="Tree.h" />

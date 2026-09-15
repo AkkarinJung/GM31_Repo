@@ -42,6 +42,8 @@
 #include "RoguelikeSystem.h"
 #include "SoundEffect.h"
 #include "SlashEffect.h"
+#include "ImpactEffect.h"
+#include "SlashArc.h"
 
 int Game::s_Stage = 0;
 bool Game::s_RunComplete = false;
@@ -460,6 +462,13 @@ void Game::Init()
 	// doing it lazily meant the first swing of the run stalled part way
 	// through the animation while thirteen textures came off disk.
 	SlashEffect::LoadShared();
+
+	// Same for the player's own attack VFX - the crescent mesh and the
+	// impact burst. Player::Init asks for both too (whichever runs first
+	// pays, and the calls are idempotent) but asking here keeps every shared
+	// VFX resource in the stage's load in one place.
+	SlashArc::LoadShared();
+	ImpactEffect::LoadShared();
 
 	// The map is built - hand over to the reward pick before gameplay runs.
 	// Scene::Init runs exactly once per map (Manager rebuilds the scene on

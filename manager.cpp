@@ -9,6 +9,8 @@
 #include "audio.h"
 #include "SoundEffect.h"
 #include "SlashEffect.h"
+#include "ImpactEffect.h"
+#include "SlashArc.h"
 #include "Font.h"
 #include "Collision.h"
 #include "Fade.h"
@@ -50,6 +52,8 @@ void Manager::Uninit()
 
 	Font::Uninit();
 	SlashEffect::UninitShared(); // shared frames outlive every scene
+	SlashArc::UninitShared();     // ... and the crescent mesh
+	ImpactEffect::UninitShared(); // ... and the impact burst's
 	SoundEffect::Uninit(); // before UninitMaster - its voices feed the master
 	Audio::UninitMaster();
 	Renderer::Uninit();

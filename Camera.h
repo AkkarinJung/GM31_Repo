@@ -46,7 +46,5 @@ public:
 	}
 
 private:
-	bool m_DebugMode = false;
-	void UpdateDebugCamera();
 };
 

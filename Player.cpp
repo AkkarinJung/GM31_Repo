@@ -24,6 +24,10 @@
 #include "Particle.h"
 #include "Fade.h"
 
+#include "SlashArc.h"
+#include "SwordTrail.h"
+#include "ImpactEffect.h"
+
 // How far through the current swing, 0..1. Anything that is not mid-swing
 // reads as finished, so callers do not have to special-case it.
 float Player::AttackProgress() const
@@ -68,6 +72,12 @@ float Player::SwingShake() const
 {
     return m_SpecialAttacking ? m_SpecialShake
                               : m_ComboShake[ComboIndex(m_AttackCombo)];
+}
+
+float Player::SwingImpactScale() const
+{
+    return m_SpecialAttacking ? m_SpecialImpactScale
+                              : m_ImpactScale[ComboIndex(m_AttackCombo)];
 }
 
 // Turns "the swing should take this many seconds" into "advance the key
@@ -222,6 +232,17 @@ void Player::BeginDeath()
     m_ParryTimer = 0.0f;
     m_HitStopFrames = 0;
 
+    // The ribbon goes with them. Update() returns at the death branch above
+    // this from now on, so nothing would ever call End() on it - and a trail
+    // left emitting would keep sampling a blade that is falling over.
+    if (m_SwordTrail != nullptr)
+    {
+        m_SwordTrail->SetFrozen(false);
+        m_SwordTrail->Clear();
+    }
+
+    m_TrailRunning = false;
+
     m_Velocity.x = 0.0f;
     m_Velocity.z = 0.0f;
 
@@ -340,6 +361,19 @@ void Player::Init()
     m_Weapon = Manager::AddGameObj<Sword>();
     m_WeaponSocket->Attach(m_Weapon);
 
+    // The blade ribbon. Built once, here, and fed by UpdateSwingTrail - a
+    // swing never spawns one. It follows the weapon through GetMatrx(), so
+    // the hand socket and the player's facing are already in it and nothing
+    // here has to know which way he is pointing.
+    m_SwordTrail = Manager::AddGameObj<SwordTrail>();
+    m_SwordTrail->SetBlade(m_Weapon, m_TrailBaseReach, m_TrailTipReach);
+
+    // Pull the shared VFX resources in now rather than on the first swing of
+    // the stage - a mesh built or a texture read mid-swing is a visible
+    // stall. Both calls are idempotent.
+    SlashArc::LoadShared();
+    ImpactEffect::LoadShared();
+
     // シェーダー読込
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout,
         "shader\\litTextureVS.cso");
@@ -359,6 +393,11 @@ void Player::Init()
 
 void Player::Uninit()
 {
+    // Manager owns every GameObject and deletes them all on a scene change,
+    // so this is not a delete - it is just making sure nothing in a later
+    // frame can reach a trail that has already been torn down.
+    m_SwordTrail = nullptr;
+
     m_VertexLayout->Release();
     m_VertexShader->Release();
     m_PixelShader->Release();
@@ -467,9 +506,6 @@ void Player::Update()
     if (Input::GetKeyPress('V')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, tuneRotStep, 0.0f });
     if (Input::GetKeyPress('B')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, -tuneRotStep });
     if (Input::GetKeyPress('M')) m_WeaponSocket->AdjustLocalRotation({ 0.0f, 0.0f, tuneRotStep });
-
-    if (Input::GetKeyTrigger('P'))
-        m_WeaponSocket->DebugPrintTransform();
 
     // Only re-aim while actually moving. atan2f(0, 0) is 0, so reading the
     // facing every frame snapped the player (and the sword parented to it)
@@ -689,6 +725,16 @@ void Player::Update()
             if (m_AttackHitFrames < 1)
                 m_AttackHitFrames = 1;
 
+            // The cut, spawned here rather than in StartAttack: at the start
+            // of a swing the sword is still behind the player's back, which
+            // is why the damage waits for m_AttackHitPoint too.
+            //
+            // Visual and hitbox are separate on purpose. The cut shows on
+            // every swing, hit or miss, and may reach further than the sword
+            // actually does - changing how it looks can never change what it
+            // damages.
+            SpawnSlashArc();
+
             // Which step of the combo this is decides what it is worth. Set
             // before BeginSwing so the very first frame of the active window
             // already carries it - Use() runs on every frame of that window.
@@ -713,6 +759,13 @@ void Player::Update()
                 // frame and shoves the camera harder than the opener does.
                 m_HitStopFrames = SwingHitStop();
                 SoundEffect::Play(SE::SwordHit);
+
+                // And the burst, on each target the weapon says it just
+                // damaged. This is the ONLY place an impact is spawned, and
+                // it is inside the branch that asked the weapon whether it
+                // hit - a miss reaches none of it and shows the ribbon and
+                // the cut alone.
+                SpawnImpacts();
 
                 Camera* camera = Manager::GetGameObj<Camera>();
                 if (camera != nullptr)
@@ -828,6 +881,13 @@ void Player::Update()
     m_AnimationModel->Update(m_AnimationName.c_str(), m_AnimationFrame, m_NextAnimationName.c_str(), m_NextAnimationFrame, m_Blend);
 
     GameObject::Update();
+
+    // LAST, and after GameObject::Update() rather than before it. The weapon
+    // socket is a component, so the blade's matrix is only this frame's once
+    // the components above have run - sampling any earlier would draw the
+    // ribbon one frame behind the sword, which on the fastest part of a swing
+    // is a visible gap between the blade and its own trail.
+    UpdateSwingTrail();
 }
 
 void Player::Draw()
@@ -1120,6 +1180,173 @@ bool Player::TryParry(GameObject* Attacker)
     return true;
 }
 
+// Spawns the swing's crescent. Called from the hit window, not from
+// StartAttack - see the note at the call site.
+void Player::SpawnSlashArc()
+{
+    // Which way this swing is going, taken from the player's ACTUAL facing
+    // rather than assumed. The play plane is XY and the facing is a yaw about
+    // Y, so the sign of the forward vector's x is the whole of it in 2.5D.
+    Vector3 forward = GetFoward();
+
+    float facing = (forward.x < 0.0f) ? -1.0f : 1.0f;
+
+    // All three axes: along the facing, up, and through depth.
+    Vector3 position = m_Position;
+    position += forward * m_ArcForward;
+    position.y += m_ArcHeight;
+    position.z += m_ArcDepth;
+
+    float aim;
+    float scale;
+    float sweep;
+    float lifetime;
+
+    // One branch per kind of attack, and the shape a new one would take.
+    // Adding a heavy, an air, a dash or a charged attack later means another
+    // set of numbers and another arm here - not a second effect class, and
+    // nothing at all in SlashArc, SwordTrail or ImpactEffect.
+    if (m_SpecialAttacking)
+    {
+        aim = m_ArcAimBase + m_SpecialArcAngle;
+        scale = m_SpecialArcScale;
+        sweep = m_SpecialArcSweep;
+        lifetime = m_SpecialArcLifetime;
+    }
+    else
+    {
+        int step = ComboIndex(m_AttackCombo);
+
+        aim = m_ArcAimBase + m_ArcAngle[step];
+        scale = m_ArcScale[step];
+        sweep = m_ArcSweep[step];
+        lifetime = m_ArcLifetime;
+    }
+
+    // Turning around mirrors the cut through the vertical, and multiplying
+    // the whole angle by the facing is exactly that mirror: the crescent's
+    // belly points -X instead of +X and every per-step tilt leans the other
+    // way with it. The sweep flips for the same reason, so the cut always
+    // travels the way the character is swinging rather than back into them.
+    float angle = facing * aim;
+
+    Manager::AddGameObj<SlashArc>()->Play(position, angle,
+        m_ArcLength * scale, m_ArcBow * scale,
+        lifetime, facing * sweep);
+}
+
+// Opens, feeds and closes the blade ribbon. Called once a frame from the end
+// of Update, and it is the only thing that touches m_SwordTrail during play.
+void Player::UpdateSwingTrail()
+{
+    if (m_SwordTrail == nullptr)
+        return;
+
+    // The impact freeze holds the animation, so it has to hold the ribbon
+    // too: the blade is not moving, and a trail that kept ageing through a
+    // nine frame stop would fade out during the one moment it exists to sell.
+    bool frozen = (m_HitStopFrames > 0);
+    m_SwordTrail->SetFrozen(frozen);
+
+    // Not swinging - which covers the swing ending, being cancelled into the
+    // next one, and being interrupted by anything at all. Whatever is already
+    // drawn stays and fades on its own clock, so the ribbon dies with the
+    // swing instead of being cut off in mid-air.
+    if (!m_Attacking)
+    {
+        if (m_TrailRunning)
+        {
+            m_SwordTrail->End();
+            m_TrailRunning = false;
+        }
+        return;
+    }
+
+    float t = AttackProgress();
+
+    // The facing, read the same way SpawnSlashArc reads it.
+    float facing = (GetFoward().x < 0.0f) ? -1.0f : 1.0f;
+
+    if (!m_TrailRunning)
+    {
+        // Still winding up. The blade is behind his back for the whole of
+        // this, and a ribbon on it would draw a streak across the character
+        // before the swing has started.
+        if (t < m_TrailOpen)
+            return;
+
+        m_SwordTrail->SetSampleLife(m_SpecialAttacking ? m_TrailLifeSpecial
+                                                       : m_TrailLife);
+        m_SwordTrail->Begin();
+
+        m_TrailRunning = true;
+        m_TrailFacing = facing;
+    }
+    else if (t >= m_TrailClose)
+    {
+        // Into the recovery frames - the arm drifting back to neutral. A
+        // ribbon following that reads as a second, aimless swing.
+        m_SwordTrail->End();
+        m_TrailRunning = false;
+        return;
+    }
+    else if (facing != m_TrailFacing)
+    {
+        // Turned round mid-swing. A swing may still be redirected up to
+        // m_AttackTurnWindow, which overlaps the start of the ribbon, and
+        // joining the two sides would draw one long polygon straight through
+        // the character. Start the ribbon again from where the blade is now.
+        m_SwordTrail->Begin();
+        m_TrailFacing = facing;
+    }
+
+    // Nothing to capture while the frame is held - the blade has not moved,
+    // and pushing the same position in repeatedly would walk the real history
+    // off the end of the buffer.
+    if (!frozen)
+        m_SwordTrail->Sample();
+}
+
+// Stop capturing, keep what is drawn. Shared by the two places a swing can
+// begin, so neither can forget it.
+void Player::EndSwingTrail()
+{
+    if (m_SwordTrail != nullptr)
+        m_SwordTrail->End();
+
+    m_TrailRunning = false;
+}
+
+// One burst per target the weapon reports having just damaged.
+//
+// The weapon decides what was hit and where; this only reads the answer. That
+// separation is the point: a swing that misses records nothing, so there is
+// no path from here to an impact that did not happen, and a swing that lands
+// on three enemies at once gets three bursts without this knowing anything
+// about reach, angles or hit radii.
+void Player::SpawnImpacts()
+{
+    if (m_Weapon == nullptr)
+        return;
+
+    int count = m_Weapon->GetFrameHitCount();
+
+    // The finisher and the counter land heavier - bigger burst, more sparks,
+    // a little longer. Same split the damage, the hitstop and the shake
+    // already use.
+    bool heavy = m_SpecialAttacking || (ComboIndex(m_AttackCombo) == 2);
+
+    float scale = SwingImpactScale();
+
+    for (int i = 0; i < count; i++)
+    {
+        Manager::AddGameObj<ImpactEffect>()->Burst(
+            m_Weapon->GetFrameHitPoint(i),
+            m_Weapon->GetFrameHitDirection(i),
+            scale, heavy);
+    }
+}
+
 void Player::StartAttack()
 {
     // No damage here any more - the swing lands on its active frame, see
@@ -1129,6 +1356,14 @@ void Player::StartAttack()
     m_AttackHitFrames = 0;
     m_AttackFrame = 0.0f;
     m_SpecialAttacking = false;
+
+    // A new swing never inherits the last one's ribbon. A combo may be
+    // cancelled into from 60% of the way through a swing, which is before the
+    // trail would have closed on its own - and carrying it over would join
+    // the end of one swing to the windup of the next with a single polygon
+    // drawn straight across the character. What is already on screen keeps
+    // fading; only the capture stops.
+    EndSwingTrail();
 
     // A step into the swing. Movement is locked while attacking, so the
     // usual drag bleeds this off on its own.
@@ -1195,6 +1430,11 @@ void Player::StartCounterAttack()
     m_AttackHitFrames = 0;
     m_AttackFrame = 0.0f;
     m_SpecialAttacking = true;
+
+    // Same as StartAttack - and this one can interrupt a normal swing at any
+    // point at all, so it matters more here.
+    EndSwingTrail();
+
     m_ParryTimer = m_ParryTime; // the deflect is live from the first frame
     m_AttackQueued = false;     // a press buffered before this must not chain out of it
 

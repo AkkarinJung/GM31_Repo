@@ -24,11 +24,31 @@ void Sword::LoadModel()
                         // a swing play with no damage behind it.
 }
 
+// Where on a target the impact burst is placed. Visual only - none of this
+// is read by the reach test above it, and changing any of it cannot change
+// what the swing damages.
+//
+// Positions in this game are at the FEET, so a burst left at GetPosition()
+// appears on the floor beside the enemy. Chest height, on the near side of
+// the body, and a little towards the camera is where the blade visibly is.
+static const float IMPACT_BODY_HEIGHT = 0.55f;  // fraction of the body height
+static const float IMPACT_SURFACE = 0.65f;  // fraction of the hit radius,
+                                            // back towards the attacker
+static const float IMPACT_DEPTH = -0.35f; // world z; the camera looks down
+                                          // +Z, so negative is towards it
+
 bool Sword::Use(GameObject* Owner)
 {
     // No CanUse()/cooldown here any more - BeginSwing() owns both. This is
     // called on every frame of the swing's active window, and a cooldown set
     // on the first of those frames would reject all the rest.
+
+    // This frame's hits only. The wielder reads these straight after this
+    // call to place its impact VFX, so last frame's must not still be in
+    // there - a target already hit would get a second burst on every
+    // remaining frame of the window.
+    ClearFrameHits();
+
     Vector3 ownerPos = Owner->GetPosition();
     Vector3 forward = Owner->GetFoward();
     forward.y = 0.0f;
@@ -122,6 +142,16 @@ bool Sword::Use(GameObject* Owner)
 
         MarkHit(enemy);
 
+        // Recorded before the damage, because AddDamage can destroy the
+        // enemy outright on a killing blow - reading its position afterwards
+        // would be reading a deleted object.
+        Vector3 impact = enemy->GetPosition();
+        impact.y += enemy->GetBodyHeight() * IMPACT_BODY_HEIGHT;
+        impact -= toEnemy * (enemy->GetHitRadius() * IMPACT_SURFACE);
+        impact.z += IMPACT_DEPTH;
+
+        RecordFrameHit(impact, forward);
+
         enemy->AddDamage(attackPower, critical);
         enemy->Shake(forward * 0.5f);
         hit = true;
@@ -166,6 +196,15 @@ bool Sword::Use(GameObject* Owner)
             continue;
 
         MarkHit(crate);
+
+        // Same reasoning as the enemy above - a crate that breaks on this
+        // blow is gone before AddDamage returns.
+        Vector3 impact = crate->GetPosition();
+        impact.y += crate->GetBodyHeight() * IMPACT_BODY_HEIGHT;
+        impact -= toCrate * (crate->GetHitRadius() * IMPACT_SURFACE);
+        impact.z += IMPACT_DEPTH;
+
+        RecordFrameHit(impact, forward);
 
         crate->AddDamage(attackPower, critical);
         crate->Shake(forward * 0.35f);

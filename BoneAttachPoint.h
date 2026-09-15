@@ -31,7 +31,6 @@ public:
     GameObject* Detach();
 
     GameObject* GetAttached() const { return m_Attached; }
-    void DebugPrintTransform() const;
     void AdjustLocalPosition(const Vector3& Delta);
     void AdjustLocalRotation(const Vector3& Delta);
 };

@@ -240,6 +240,128 @@ private:
     // A small step into the swing, so an attack has weight behind it.
     const float m_AttackLunge = 3.0f;
 
+    // =====================================================================
+    // ATTACK VFX
+    //
+    // Three parts, and none of them is the hitbox. The hitbox is Sword::Use
+    // and it is driven from a different place in Update(), so everything
+    // below can be moved, resized or switched off without changing what a
+    // swing damages:
+    //
+    //   SwordTrail    the ribbon the blade drags   - the MOTION
+    //   SlashArc      the crescent, as geometry    - the CUT
+    //   ImpactEffect  the burst where it lands     - the CONTACT
+    //
+    // The first two run on every swing, hit or miss. The third only exists
+    // when the weapon reports a target it actually damaged.
+    // =====================================================================
+
+    // ---- the cut (SlashArc) ---------------------------------------------
+    //
+    // Placed relative to the player, not the sword. The hand sweeps through a
+    // wide arc mid-swing, so an arc centred on it lands somewhere different
+    // every time; measuring from the player puts the cut in the same readable
+    // place on every swing. The ribbon is the thing that follows the blade.
+    //
+    // Forward runs along the way the player faces, Height is straight up, and
+    // Depth is world Z - the camera looks down +Z, so negative pulls the cut
+    // in front of the body rather than through it.
+    float m_ArcForward = 0.85f;
+    float m_ArcHeight = 1.05f;
+    float m_ArcDepth = -0.35f;
+
+    // SlashLength / SlashWidth. Length is HALF the chord, so the cut spans
+    // twice this; Bow is how far it bellies out from that chord.
+    float m_ArcLength = 1.25f;
+    float m_ArcBow = 1.25f;
+
+    // Which way the cut points when the player faces +X.
+    //
+    // The crescent is generated with its chord along local X and its belly
+    // along local +Y, so a roll of -90 degrees turns the belly to face the
+    // way he is going - a forward cut. Every per-step angle below is an
+    // offset from that, which is why they are all small numbers.
+    const float m_ArcAimBase = -1.5708f;
+
+    // Per combo step: how the cut is tilted off that forward aim, how big it
+    // is, and how far it travels over its life.
+    //
+    // A down-cut, an up-cut coming back the other way, and a bigger finisher.
+    // Alternating the sweep sign is what makes the combo read as
+    // back-and-forth rather than three swipes the same way.
+    const float m_ArcAngle[3] = { -0.45f,  0.42f, -0.16f };
+    const float m_ArcScale[3] = {  1.00f,  1.00f,  1.32f };
+    const float m_ArcSweep[3] = {  0.55f, -0.55f,  0.72f };
+
+    // AttackVFXDuration for the cut. Short: a slash that lingers stops
+    // reading as a fast one.
+    const float m_ArcLifetime = 0.16f;
+
+    // The special/parry swing is one heavy answer rather than a step in a
+    // chain, so it lands off its own numbers - bigger, slower, flatter.
+    const float m_SpecialArcAngle = -0.10f;
+    const float m_SpecialArcScale = 1.45f;
+    const float m_SpecialArcSweep = 0.85f;
+    const float m_SpecialArcLifetime = 0.22f;
+
+    // Spawns the swing's crescent. Visual only - never damage.
+    void SpawnSlashArc();
+
+    // ---- the ribbon (SwordTrail) ----------------------------------------
+    //
+    // ONE object, built in Init and alive as long as the player - not one per
+    // swing. A swing turns it on and off and feeds it the blade position once
+    // a frame, so a three hit combo allocates nothing at all.
+    class SwordTrail* m_SwordTrail = nullptr;
+
+    // Where in the swing the ribbon captures, as fractions of the SLICE - the
+    // same space m_AttackHitPoint is in, so these sit next to it.
+    //
+    // Opening before the hit point is the whole point of a trail: the blade
+    // has to already be streaking when it arrives, or the effect reads as
+    // something that happened after the hit. It closes well before the clip
+    // does, because the recovery frames are the arm drifting back to neutral
+    // and a ribbon following that looks like a second, aimless swing.
+    const float m_TrailOpen = 0.30f;
+    const float m_TrailClose = 0.85f;
+
+    // TrailFadeTime - how long a captured point survives, which is what sets
+    // the ribbon's LENGTH. The special swing is slower and heavier, so its
+    // ribbon is allowed to run longer.
+    const float m_TrailLife = 0.16f;
+    const float m_TrailLifeSpecial = 0.22f;
+
+    // Where the ribbon's two edges sit along the blade, in world units.
+    // sword.fbx runs from 0.004 to 1.093 down its own long axis, so these
+    // span very nearly the whole blade and stop just short of the grip.
+    const float m_TrailBaseReach = 0.14f;
+    const float m_TrailTipReach = 1.05f;
+
+    bool  m_TrailRunning = false;
+    float m_TrailFacing = 1.0f;   // which way he was facing when it started
+
+    // Drives all of the above: opens, samples, closes. Called once a frame,
+    // after the components have moved the weapon.
+    void UpdateSwingTrail();
+
+    // Stops the ribbon capturing without clearing what is already drawn.
+    void EndSwingTrail();
+
+    // ---- the burst (ImpactEffect) ---------------------------------------
+    //
+    // ImpactScale per combo step, so the finisher's contact is as much bigger
+    // than the opener's as its damage, its hitstop and its camera kick
+    // already are. Indexed like the three tables above it.
+    const float m_ImpactScale[3] = { 0.95f, 1.05f, 1.35f };
+    const float m_SpecialImpactScale = 1.40f;
+
+    float SwingImpactScale() const;
+
+    // Puts one burst on every target the weapon reports having just damaged.
+    // Reads the weapon's hit list - it never works out for itself what was
+    // hit, which is what keeps the VFX out of the damage path.
+    void SpawnImpacts();
+
     //Right attack
     int m_RightAttackMPCost = 15;
 
