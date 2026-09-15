@@ -11,6 +11,7 @@
 #include "SlashEffect.h"
 #include "Font.h"
 #include "Collision.h"
+#include "Fade.h"
 
 #include "GameObject.h"
 
@@ -68,14 +69,19 @@ void Manager::Update()
 	if(m_Scene != nullptr)
 	m_Scene->Update();
 
-	if (!m_Pause)
+	for (GameObject* obj : m_GameObjects)
 	{
-		for (GameObject* obj : m_GameObjects)
-		{
-			if (obj != nullptr) {
-				obj->Update();
-			}
-		}
+		if (obj == nullptr)
+			continue;
+
+		// The pause stops things THINKING, but a screen transition is not
+		// thinking - it is what the player is looking at. The reward pick
+		// pauses for as long as the card screen is up, and a fade caught by
+		// that would sit frozen at half black. See GameObject::UpdatesWhilePaused.
+		if (m_Pause && !obj->UpdatesWhilePaused())
+			continue;
+
+		obj->Update();
 	}
 
 	// Outside the pause. Pausing stops things THINKING; it was never meant to
@@ -166,6 +172,19 @@ void Manager::Draw()
 
 	if (m_Scene != nullptr)
 		m_Scene->Draw();
+
+	// The fade goes on last of all - after every object AND after the scene's
+	// own Draw, which is where Title and Result put their text. Its layer is
+	// outside the range the loop above walks, so this is the only place it is
+	// drawn and it can never cover itself twice.
+	for (GameObject* obj : m_GameObjects)
+	{
+		if (obj == nullptr || obj->IsDestroyed())
+			continue;
+
+		if (obj->GetLayer() == Fade::FADE_LAYER)
+			obj->Draw();
+	}
 
 	Renderer::End();
 }

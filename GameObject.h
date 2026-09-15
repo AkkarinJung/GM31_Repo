@@ -103,6 +103,14 @@ public:
 	}
 	
 
+	// Does this object keep thinking while Manager::SetPause(true) is on?
+	//
+	// Almost nothing should: the pause exists so the reward pick can hold the
+	// game still. A screen transition is the exception - it is what the player
+	// is looking at, and a fade frozen half way through reads as a hang. See
+	// Fade.
+	virtual bool UpdatesWhilePaused() const { return false; }
+
 	virtual void Init() {};
 	virtual void Uninit() 
 	{

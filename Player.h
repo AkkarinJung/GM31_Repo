@@ -204,9 +204,8 @@ private:
     //
     // All three steps used to deal identical damage, freeze for identical
     // hitstop and kick the camera by an identical amount - which is why the
-    // finisher never landed like one. The VISUALS already scaled it: look at
-    // m_SlashStepScale below, where step 3 is 1.35x. So the third hit looked
-    // heavier than it hit, and the combo read as the same swing three times.
+    // finisher never landed like one, and why the combo read as the same
+    // swing three times rather than as something building.
     //
     // Indexed by m_AttackCombo (0..2). Kept as three tables side by side so a
     // fourth step cannot be added to one and forgotten in the others.
@@ -240,107 +239,6 @@ private:
 
     // A small step into the swing, so an attack has weight behind it.
     const float m_AttackLunge = 3.0f;
-
-    // Slash VFX. Purely visual: the hitbox is Sword::Use and the two are
-    // triggered separately, so these can be tuned for looks alone.
-    // Angles are a screen-space roll in radians - 0 is a flat horizontal
-    // streak, positive rolls counter-clockwise.
-    // Slash VFX. Purely visual: the hitbox is Sword::Use and the two are
-    // triggered separately, so these are tuned for looks alone.
-    //
-    // Anchored to the player, NOT to the sword. The hand sits near the chest
-    // and sweeps through a wide arc during the swing, so a sprite centred on
-    // it landed somewhere different every time; measuring from the player
-    // puts the arc in the same readable place on every swing.
-    //
-    // Not const, and not final: the debug keys in Update() move them live -
-    // press F5 to print the numbers and paste them back here.
-    // Offset from the player, all three axes. Forward runs along the way the
-    // player faces, Height is straight up, Depth is world Z - the play plane
-    // is z=0 and the camera looks down +Z, so positive Depth pushes the arc
-    // away from the viewer and negative pulls it in front of the character.
-    // Small, because the arc is meant to wrap AROUND the character (see the
-    // reference art) rather than float out in front of him. Pushed too far
-    // forward it stops reading as his swing at all, whatever the angle is.
-    float m_SlashForward = 0.30f;
-    float m_SlashHeight = 1.00f;
-    float m_SlashDepth = -0.3f;    // slightly towards the camera, so the arc
-                                   // passes in front of the body
-
-    // Half-size of the crescent. The curve is baked into the texture, which
-    // is square, so these stay close to each other - pulling them apart
-    // squashes the arc rather than lengthening the swing. Raise both to
-    // sweep a wider circle around the character.
-    float m_SlashLength = 1.5f;
-    float m_SlashThickness = 1.5f;
-
-    // How far the arc turns as it travels, in radians. Small: the crescent
-    // already reads as a swing, and spinning it far just looks like a wheel.
-    float m_SlashSweep = 0.45f;
-
-    // Live tuning offsets, added to every slash. The debug keys in Update()
-    // move these - press F5 to print them and paste the numbers back.
-    float m_SlashPitchTune = 0.0f;
-    float m_SlashYawTune = 0.0f;
-    float m_SlashRollTune = 0.0f;
-
-    // One 3D pose per step of the combo, in radians. Hand-authored, NOT
-    // measured off the sword - see the note above SpawnSlash for why the two
-    // measuring modes were removed.
-    //
-    // Roll is the one that has to be there: the crescent bulges along its own
-    // +X, so this is the direction the cut points. Pitch and yaw stop it
-    // reading as a flat sticker - they tip the plane of the swing into the
-    // scene, so the arc sweeps through depth rather than across the screen.
-    //
-    // The three steps are a down-cut, an up-cut coming back the other way,
-    // and a bigger overhead finisher. Keep every roll well inside +/-90 or
-    // the arc starts pointing behind the player.
-    const float m_SlashPitch[3] = {  0.15f, -0.18f,  0.22f };
-    const float m_SlashYaw[3]   = {  0.28f,  0.38f, -0.32f };
-    const float m_SlashRoll[3]  = { -0.35f,  0.40f, -0.60f };
-
-    // Which way the arc travels during its life, per step. Alternating the
-    // sign is what makes a combo read as back-and-forth rather than three
-    // swipes the same way.
-    const float m_SlashSweepDir[3] = { 1.0f, -1.0f, 1.0f };
-
-    // The finisher is bigger than the two that set it up.
-    const float m_SlashStepScale[3] = { 1.0f, 1.0f, 1.35f };
-
-    const float m_SlashLifetime = 0.18f; // short: a slash that lingers stops
-                                         // reading as a fast one
-
-    // The arc rides the blade instead of standing where it spawned.
-    //
-    // Anchoring it to the player meant the roll had to be guessed from a
-    // single instant, and the only instant available - the frame the hit
-    // lands - has the blade behind his back on two of the three combo steps.
-    // Riding it removes the guess: the arc simply is wherever the sword is,
-    // pointing the way the sword points, for as long as it lives.
-    //
-    // Set false to go back to a fixed arc using the m_SlashRoll table.
-    bool m_SlashFollowsSword = true;
-    float m_SlashFollowReach = 0.55f; // how far up the blade the arc centres
-
-    // The special/parry swing gets a bigger, slower, flatter one - it reads
-    // as a heavier, more deliberate cut.
-    const float m_SpecialSlashLength = 2.4f;
-    const float m_SpecialSlashThickness = 2.4f;
-    const float m_SpecialSlashSweep = 0.70f;
-    const float m_SpecialSlashLifetime = 0.24f;
-    const float m_SpecialSlashPitch = 0.10f;
-    const float m_SpecialSlashYaw = 0.20f;
-
-    void DebugTuneSlash();
-
-    // The roll used to be measurable three ways - a fixed table, the blade's
-    // own direction, and the sword's velocity - switchable at runtime. Both
-    // measured modes are gone. They sampled the sword at the hit frame, which
-    // is a moment when the blade is genuinely still behind the player on two
-    // of the three swings, so they aimed the arc backwards: the blade mode
-    // logged along -0.787 on step 1 and the motion mode logged a roll of
-    // -174 degrees on step 2. The maths was right; the instant was wrong.
 
     //Right attack
     int m_RightAttackMPCost = 15;
@@ -395,9 +293,6 @@ private:
 
     void StartAttack();
     void StartRightAttack();
-
-    // Spawns the swing's slash sprite. Visual only - never damage.
-    void SpawnSlash();
 
     // The AttackRight swing on its own. StartRightAttack pays MP for it; a
     // parry gets it free, because the parry already paid.

@@ -192,6 +192,30 @@
     <ClCompile Include="Shadow.cpp">
       <Filter>Source Files\VisualEffect</Filter>
     </ClCompile>
+    <ClCompile Include="Crate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EnemyShot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Loading.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Potion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PotionBag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PotionSlotUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ToonShader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Fade.cpp">
+      <Filter>Source Files\VisualEffect</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -348,6 +372,30 @@
       <Filter>Header Files\Enviroment</Filter>
     </ClInclude>
     <ClInclude Include="Shadow.h">
+      <Filter>Header Files\VisualEffect</Filter>
+    </ClInclude>
+    <ClInclude Include="Crate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EnemyShot.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Loading.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Potion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PotionBag.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PotionSlotUI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ToonShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Fade.h">
       <Filter>Header Files\VisualEffect</Filter>
     </ClInclude>
   </ItemGroup>

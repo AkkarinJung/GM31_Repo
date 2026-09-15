@@ -20,7 +20,6 @@
 
 #include "BoneAttachPoint.h"
 #include "Sword.h"
-#include "SlashEffect.h"
 #include "Result.h"
 #include "Particle.h"
 
@@ -214,8 +213,8 @@ void Player::BeginDeath()
     m_DeathTimer = 0.0f;
     m_DeathFrame = 0.0f;
 
-    // Drop everything mid-action. A swing left running would keep its hitbox
-    // and its slash, and the special would leave the parry window open on a
+    // Drop everything mid-action. A swing left running would keep its
+    // hitbox, and the special would leave the parry window open on a
     // corpse.
     m_Attacking = false;
     m_SpecialAttacking = false;
@@ -470,8 +469,6 @@ void Player::Update()
     if (Input::GetKeyTrigger('P'))
         m_WeaponSocket->DebugPrintTransform();
 
-    DebugTuneSlash();
-
     // Only re-aim while actually moving. atan2f(0, 0) is 0, so reading the
     // facing every frame snapped the player (and the sword parented to it)
     // round to face +Z the moment the velocity died out, and flipped it
@@ -689,12 +686,6 @@ void Player::Update()
             m_AttackHitFrames = windowClose - windowOpen + 1;
             if (m_AttackHitFrames < 1)
                 m_AttackHitFrames = 1;
-
-            // Visual and hitbox are separate on purpose. The slash shows on
-            // every swing, hit or miss, and may reach further than the sword
-            // actually does - changing how it looks can never change what it
-            // damages.
-            SpawnSlash();
 
             // Which step of the combo this is decides what it is worth. Set
             // before BeginSwing so the very first frame of the active window
@@ -1125,156 +1116,6 @@ bool Player::TryParry(GameObject* Attacker)
         m_Stats->RestoreMP(m_ParryMPReward);
 
     return true;
-}
-
-// Live tuning for the slash placement, in the same spirit as the weapon
-// socket keys above: swing, nudge, swing again, and press F5 to print the
-// numbers so they can be pasted back into Player.h. Nothing here affects
-// damage - the hitbox is Sword::Use and never reads any of it.
-//
-//   position   I / O   forward       J / L   height      8 / 9   depth (Z)
-//   rotation   4 / 5   roll          Y / 0   yaw         F6 / F7 pitch
-//   size       6 / 7   length        F8 / F9 thickness
-//   F5         print the current values
-void Player::DebugTuneSlash()
-{
-    const float dt = 1.0f / 60.0f;
-    const float moveStep = 1.5f * dt;
-    const float angleStep = 1.5f * dt;
-    const float scaleStep = 1.0f * dt;
-
-    if (Input::GetKeyPress('I')) m_SlashForward -= moveStep;
-    if (Input::GetKeyPress('O')) m_SlashForward += moveStep;
-    if (Input::GetKeyPress('J')) m_SlashHeight -= moveStep;
-    if (Input::GetKeyPress('L')) m_SlashHeight += moveStep;
-    if (Input::GetKeyPress('8')) m_SlashDepth -= moveStep;
-    if (Input::GetKeyPress('9')) m_SlashDepth += moveStep;
-
-    if (Input::GetKeyPress('4')) m_SlashRollTune -= angleStep;
-    if (Input::GetKeyPress('5')) m_SlashRollTune += angleStep;
-    if (Input::GetKeyPress('Y')) m_SlashYawTune -= angleStep;
-    if (Input::GetKeyPress('0')) m_SlashYawTune += angleStep;
-    if (Input::GetKeyPress(VK_F6)) m_SlashPitchTune -= angleStep;
-    if (Input::GetKeyPress(VK_F7)) m_SlashPitchTune += angleStep;
-
-    if (Input::GetKeyPress('6')) m_SlashLength -= scaleStep;
-    if (Input::GetKeyPress('7')) m_SlashLength += scaleStep;
-    if (Input::GetKeyPress(VK_F8)) m_SlashThickness -= scaleStep * 0.4f;
-    if (Input::GetKeyPress(VK_F9)) m_SlashThickness += scaleStep * 0.4f;
-
-    if (m_SlashLength < 0.1f)    m_SlashLength = 0.1f;
-    if (m_SlashThickness < 0.02f) m_SlashThickness = 0.02f;
-
-    if (Input::GetKeyTrigger(VK_F5))
-    {
-        char buffer[256];
-        sprintf_s(buffer,
-            "[Slash] forward %.4f  height %.4f  depth %.4f"
-            "  length %.4f  thickness %.4f  sweep %.4f"
-            "  pitch %+.4f  yaw %+.4f  roll %+.4f\n",
-            m_SlashForward, m_SlashHeight, m_SlashDepth,
-            m_SlashLength, m_SlashThickness, m_SlashSweep,
-            m_SlashPitchTune, m_SlashYawTune, m_SlashRollTune);
-        OutputDebugStringA(buffer);
-
-    }
-}
-
-// Spawns the swing's slash sprite. Called from the hit window, not from
-// StartAttack: at the start of a swing the sword is still behind the
-// player's back (which is why the damage waits for m_AttackHitPoint too),
-// and BoneAttachPoint - a component, so it runs at the END of this
-// Update - has not yet moved the sword onto the new animation's first pose.
-void Player::SpawnSlash()
-{
-    // Measured from the player, not from the sword. The sword's own
-    // transform is awkward twice over: m_Position on it is in the model's
-    // space rather than the world (BoneAttachPoint parents it to the player
-    // and lets GetMatrx() fold the 0.01 scale in), and even read correctly
-    // the hand sweeps through a wide arc mid-swing, so a sprite centred on
-    // it never landed in the same place twice.
-    Vector3 forward = GetFoward();
-
-    // All three axes: along the facing, up, and through depth.
-    Vector3 position = m_Position;
-    position += forward * m_SlashForward;
-    position.y += m_SlashHeight;
-    position.z += m_SlashDepth;
-
-    float length;
-    float thickness;
-    float sweep;
-    float lifetime;
-    float pitch;
-    float yaw;
-    float roll;
-
-    if (m_SpecialAttacking)
-    {
-        length = m_SpecialSlashLength;
-        thickness = m_SpecialSlashThickness;
-        sweep = m_SpecialSlashSweep;
-        lifetime = m_SpecialSlashLifetime;
-        pitch = m_SpecialSlashPitch;
-        yaw = m_SpecialSlashYaw;
-        roll = 0.0f;
-    }
-    else
-    {
-        int step = m_AttackCombo % 3;
-
-        length = m_SlashLength * m_SlashStepScale[step];
-        thickness = m_SlashThickness * m_SlashStepScale[step];
-        sweep = m_SlashSweep * m_SlashSweepDir[step];
-        lifetime = m_SlashLifetime;
-        pitch = m_SlashPitch[step];
-        yaw = m_SlashYaw[step];
-        roll = m_SlashRoll[step];
-    }
-
-    pitch += m_SlashPitchTune;
-    yaw += m_SlashYawTune;
-    roll += m_SlashRollTune;
-
-    // Turning around is a mirror through the YZ plane: yaw negates, pitch is
-    // unchanged, and the roll is handled just below.
-    float facing = (forward.x < 0.0f) ? -1.0f : 1.0f;
-
-    Vector3 rotation;
-    rotation.x = pitch;
-    rotation.y = facing * yaw;
-
-    // Roll: the hand-authored table, not a measurement.
-    //
-    // Two measuring modes used to live here - the blade's own direction and
-    // the sword's frame-to-frame velocity - and both were removed because
-    // they read the sword at the moment the hit lands, which is not the
-    // moment the swing looks like anything. Logged over a full combo, the
-    // blade mode gave along -0.787 on step 1 (the sword is behind the
-    // player's back there) and only 0.462 of unit length on step 2 (the rest
-    // of it aimed into the screen, so the on-screen angle was mostly
-    // rounding). Both aimed two of the three arcs backwards. The maths was
-    // correct; the instant it sampled was not.
-    //
-    // The crescent is drawn already bulging right, so facing right needs no
-    // base turn. Facing left is (PI - roll), which mirrors it, because the
-    // arc is symmetric about its own horizontal axis. A negative X scale
-    // would be the obvious mirror and is wrong here - back-face culling
-    // would swallow it.
-    rotation.z = (facing > 0.0f) ? roll : (XM_PI - roll);
-
-    Vector3 slashScale(length, thickness, 1.0f);
-
-    // The sweep flips with the facing too, so the blade always travels the
-    // way the character is swinging rather than back into them.
-    SlashEffect* slash = Manager::AddGameObj<SlashEffect>();
-    slash->Play(position, rotation, slashScale, lifetime, 1.0f, facing * sweep);
-
-    // Riding the blade overrides the position and the roll set above; the
-    // pitch and yaw from the table survive, which is what keeps the arc
-    // tilted into the scene rather than flat against the camera.
-    if (m_SlashFollowsSword && m_Weapon != nullptr)
-        slash->FollowWeapon(m_Weapon, m_SlashFollowReach, m_SlashDepth);
 }
 
 void Player::StartAttack()
