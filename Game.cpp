@@ -22,6 +22,7 @@
 
 #include "GameObject.h"
 #include "Result.h"
+#include "Stats.h"
 
 #include "HPBar.h"
 #include "ControlsUI.h"
@@ -39,6 +40,7 @@
 
 int Game::s_Stage = 0;
 bool Game::s_RunComplete = false;
+int Game::s_CarriedHP = Game::NoCarriedHP;
 
 // Stage data only names an enemy type - this turns that into the AI preset
 // the enemy is configured with, so the table stays free of engine types.
@@ -72,6 +74,7 @@ void Game::ResetProgress()
 {
 	s_Stage = 0;
 	s_RunComplete = false;
+	s_CarriedHP = NoCarriedHP; // a new run starts at full HP
 	RoguelikeSystem::ResetRun(); // a new run starts with no rewards carried over
 	Score::ResetRun();           // and with nothing killed yet
 }
@@ -391,6 +394,18 @@ void Game::Init()
 	// every change) and Start() ignores repeat calls, so the pick can never
 	// happen twice. It pauses the game objects until a card is picked.
 	m_Roguelike.Start(player, 3);
+
+	// Damage carries between stages: the player is a new object at full HP,
+	// so put back the HP the last stage ended on. This has to come after
+	// Start - that is where the run's Max HP rewards are re-applied, and
+	// restoring before them would clamp to a ceiling that is not the run's.
+	if (s_CarriedHP != NoCarriedHP)
+	{
+		Stats* stats = player->GetGameComponent<Stats>();
+
+		if (stats != nullptr)
+			stats->SetHP(s_CarriedHP);
+	}
 }
 
 
@@ -424,6 +439,16 @@ void Game::Update()
 			// Next stage: the scene is rebuilt, so the map, the enemies and
 			// the reward pick are all fresh. Rewards taken so far are
 			// re-applied by RoguelikeSystem::Start.
+			//
+			// HP does not reset with the scene - whatever is left now is what
+			// the next stage starts on, so it is read off the player before
+			// the object goes away. Clearing a stage is not a heal.
+			Player* player = Manager::GetGameObj<Player>();
+			Stats* stats = player != nullptr ? player->GetGameComponent<Stats>() : nullptr;
+
+			if (stats != nullptr)
+				s_CarriedHP = stats->GetHP();
+
 			s_Stage++;
 			Manager::ChangeScene<Game>(3.0f);
 		}

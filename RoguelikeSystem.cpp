@@ -266,8 +266,9 @@ void RoguelikeSystem::ApplyCommon(const RoguelikeReward& Reward)
     switch ((CommonStat)Reward.Stat)
     {
     case CommonStat::MaxHP:
-        // SetMaxHP also refills HP - harmless here, the pick happens
-        // before the map starts and the player is at full HP anyway.
+        // SetMaxHP grants the extra HP on top of what the player has rather
+        // than refilling the bar, so re-applying this every stage cannot
+        // turn a carried-over HP total back into a full one.
         if (stats != nullptr)
             stats->SetMaxHP(stats->GetMaxHP() + (int)Reward.Value);
         break;
@@ -297,9 +298,9 @@ void RoguelikeSystem::ApplyCommon(const RoguelikeReward& Reward)
 
     // ---- the MP economy ----
     case CommonStat::MaxMP:
-        // SetMaxMP refills MP as well, exactly like SetMaxHP. Harmless for
-        // the same reason: the pick happens before the map starts, with the
-        // player already full.
+        // SetMaxMP still refills MP - unlike SetMaxHP, which no longer
+        // refills now that HP carries between stages. Harmless: MP does not
+        // carry, so the player starts every map with a full bar anyway.
         if (stats != nullptr)
             stats->SetMaxMP(stats->GetMaxMP() + (int)Reward.Value);
         break;

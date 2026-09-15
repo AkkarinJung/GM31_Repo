@@ -27,7 +27,36 @@ public:
     int GetDefense() const { return m_Defense; }
     float GetCriticalChance() const { return m_CriticalChance; }
 
-    void SetMaxHP(int MaxHP) { m_MaxHP = MaxHP; m_HP = MaxHP; }
+    // Raising the ceiling grants that much HP rather than topping the bar
+    // up. Current HP carries from one stage to the next (see Game), so a
+    // "+20 Max HP" reward that refilled would double as a free full heal.
+    void SetMaxHP(int MaxHP)
+    {
+        if (MaxHP < 1)
+            MaxHP = 1;
+
+        m_HP += MaxHP - m_MaxHP;
+        m_MaxHP = MaxHP;
+
+        if (m_HP > m_MaxHP)
+            m_HP = m_MaxHP;
+
+        if (m_HP < 0)
+            m_HP = 0;
+    }
+
+    // Straight set, for restoring the HP a previous stage ended on.
+    void SetHP(int HP)
+    {
+        if (HP > m_MaxHP)
+            HP = m_MaxHP;
+
+        if (HP < 0)
+            HP = 0;
+
+        m_HP = HP;
+    }
+
     void SetMaxMP(int MaxMP) { m_MaxMP = MaxMP; m_MP = MaxMP; }
 
     void SetAttack(int Attack) { m_Attack = Attack; }

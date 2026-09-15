@@ -24,6 +24,13 @@ private:
 	// from "next stage starting" by looking at the index alone.
 	static bool s_RunComplete;
 
+	// HP the player finished the previous stage on. Clearing a stage rebuilds
+	// the scene, so the Player is a new object back at full HP - this is what
+	// carries the damage taken across the gap. -1 means "nothing to restore",
+	// which is the first stage of a run.
+	static int s_CarriedHP;
+	static const int NoCarriedHP = -1;
+
 public:
 	void Init() override;
 	void Uninit() override;
