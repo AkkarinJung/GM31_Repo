@@ -21,6 +21,7 @@
 #include "BoneAttachPoint.h"
 #include "Sword.h"
 #include "SlashEffect.h"
+#include "Particle.h"
 
 // How far through the current swing, 0..1. Anything that is not mid-swing
 // reads as finished, so callers do not have to special-case it.
@@ -184,6 +185,16 @@ void Player::Init()
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
     m_Scale = { 0.01f, 0.01f, 0.01f };
+
+    // Face down +X, the way the stages run.
+    //
+    // This has to be set, not left at zero. The facing is written as
+    // atan2f(m_Velocity.x, m_Velocity.z) further down, and z is always zero
+    // in a 2.5D game - so the only two values that code can ever produce are
+    // +PI/2 (right) and -PI/2 (left). A default yaw of 0 is neither of them:
+    // it points the player straight into the screen, which is why he started
+    // every stage facing the camera until the first key was pressed.
+    m_Rotation.y = atan2f(1.0f, 0.0f);
 
     //ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
     //m_ModelRenderer->Load("asset\\model\\player.obj");
@@ -364,6 +375,16 @@ void Player::Update()
         //m_Scale.z = 0.5f;
 
         SoundEffect::Play(SE::Jump);
+
+        // Dust off the floor, from here rather than from Particle watching
+        // the key itself: this branch is the only place a jump actually
+        // happens. Reading SPACE over there also fired on presses the jump
+        // refused - in mid air, most obviously - so the puff appeared with
+        // the player nowhere near the ground.
+        Particle* particle = Manager::GetGameObj<Particle>();
+
+        if (particle != nullptr)
+            particle->JumpDust(m_Position);
     }
 
     //return scale to original

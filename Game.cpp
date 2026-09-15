@@ -392,7 +392,10 @@ void Game::Init()
 
 	Manager::AddGameObj<Particle>()->SetPosition({ -2.0f,1.0f,-1.0f });
 
-	Manager::AddGameObj<Score>()->SetPosition({ 100.0f,100.0f,0.0f });
+	// Top right, and the anchor is the RIGHT edge of the readout - Score
+	// lays its digits out leftwards from here. It used to sit at 100,100 and
+	// run 200 pixels to the right, straight through the potion slots.
+	Manager::AddGameObj<Score>()->SetPosition({ SCREEN_WIDTH - 26.0f, 22.0f, 0.0f });
 	Manager::AddGameObj<HPBar>()->Init(30.0f, 20.0f, 300.0f, 50.0f, player, BarStat::HP, L"asset\\texture\\UI_Bar\\bar_fill_red.png");
 	Manager::AddGameObj<HPBar>()->Init(0.0f, 45.0f, 300.0f, 50.0f, player, BarStat::MP, L"asset\\texture\\UI_Bar\\bar_fill_blue.png");
 	Manager::AddGameObj<PotionSlotUI>();

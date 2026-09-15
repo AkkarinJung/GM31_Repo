@@ -11,6 +11,7 @@ C:\Users\pro19\Desktop\GM31_Repo\DamageNumber.cpp;C:\Users\pro19\Desktop\GM31_Re
 C:\Users\pro19\Desktop\GM31_Repo\Enemy.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Enemy.obj
 C:\Users\pro19\Desktop\GM31_Repo\EnemyAI.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\EnemyAI.obj
 C:\Users\pro19\Desktop\GM31_Repo\EnemyHPBar.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\EnemyHPBar.obj
+C:\Users\pro19\Desktop\GM31_Repo\EnemyShot.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\EnemyShot.obj
 C:\Users\pro19\Desktop\GM31_Repo\Explosion.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Explosion.obj
 C:\Users\pro19\Desktop\GM31_Repo\field.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\field.obj
 C:\Users\pro19\Desktop\GM31_Repo\Font.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Font.obj
@@ -19,6 +20,7 @@ C:\Users\pro19\Desktop\GM31_Repo\Grass.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31
 C:\Users\pro19\Desktop\GM31_Repo\Hedge.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Hedge.obj
 C:\Users\pro19\Desktop\GM31_Repo\HPBar.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\HPBar.obj
 C:\Users\pro19\Desktop\GM31_Repo\input.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\input.obj
+C:\Users\pro19\Desktop\GM31_Repo\Loading.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Loading.obj
 C:\Users\pro19\Desktop\GM31_Repo\main.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\main.obj
 C:\Users\pro19\Desktop\GM31_Repo\manager.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\manager.obj
 C:\Users\pro19\Desktop\GM31_Repo\MeshField.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\MeshField.obj

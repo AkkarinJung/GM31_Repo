@@ -72,6 +72,16 @@ struct EnemyAIConfig
 
     // Attack.
     bool  CanAttack = false;
+
+    // How the attack is delivered. false = it swings where it stands and the
+    // damage lands at the end of the telegraph; true = it throws a slash wave
+    // that has to travel (see EnemyShot), and the damage arrives when the
+    // wave does.
+    //
+    // This is the one line that makes an enemy ranged, so a preset changes
+    // its whole role by flipping it - and the ranges below have to move with
+    // it, because they mean reach for a swing and firing distance for a wave.
+    bool  RangedAttack = false;
     float AttackRange = 1.2f;
     float AttackHeight = 1.5f;   // vertical band it will commit to a swing in -
                                  // keeps a grounded enemy from attacking a
@@ -208,6 +218,7 @@ public:
 
     // What the owner needs to time its own swing against.
     float GetAttackRange() const { return m_Config.AttackRange; }
+    bool  IsRangedAttack() const { return m_Config.RangedAttack; }
     float GetAttackHeight() const { return m_Config.AttackHeight; }
     float GetAttackDuration() const { return m_Config.AttackDuration; }
 

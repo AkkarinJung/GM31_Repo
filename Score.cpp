@@ -6,6 +6,17 @@
 #define SPRITE_COLUMNS (5)
 #define NUM_SPRTIE (SPRITE_ROW * SPRITE_COLUMNS)
 
+// How big one digit is drawn, and the most that can be shown.
+//
+// It used to be 50, four digits wide, always drawn from m_Position to the
+// RIGHT - a 200 pixel block that ran straight through the potion slots once
+// those arrived under the stat bars. At 26 it is a readout rather than a
+// scoreboard, and it is laid out LEFTWARDS from m_Position (see Draw), so
+// m_Position is the top-RIGHT corner and the digits cannot grow into
+// anything no matter how high the count gets.
+static const float DIGIT_SIZE = 26.0f;
+static const int MAX_DIGITS = 4;
+
 int Score::s_RunTotal = 0;
 
 void Score::Init()
@@ -126,8 +137,17 @@ void Score::Draw()
 
     int number = m_Score;
 
-    // Draw 4 digits
-    for (int i = 0; i < 4; i++)
+    // Only the digits the number actually has. Four of them always drawn
+    // meant a fresh stage read "0000", which looks like a placeholder that
+    // was never finished rather than a score of nothing.
+    int digits = 1;
+    for (int n = number; n >= 10; n /= 10)
+        digits++;
+
+    if (digits > MAX_DIGITS)
+        digits = MAX_DIGITS;
+
+    for (int i = 0; i < digits; i++)
     {
         int digit = number % 10;
         number /= 10;
@@ -146,24 +166,28 @@ void Score::Draw()
         {
             VERTEX_3D* vertex = (VERTEX_3D*)msr.pData;
 
-            float x = (3 - i) * 50.0f;
+            // Laid out leftwards from the anchor: i = 0 is the least
+            // significant digit and sits immediately left of m_Position, so
+            // the block is right-aligned for free and a fifth digit would
+            // grow away from the rest of the HUD rather than into it.
+            float x = -(float)(i + 1) * DIGIT_SIZE;
 
             vertex[0].Position = XMFLOAT3(x, 0.0f, 0.0f);
             vertex[0].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
             vertex[0].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[0].TexCoord = XMFLOAT2(u, v);
 
-            vertex[1].Position = XMFLOAT3(x + 50.0f, 0.0f, 0.0f);
+            vertex[1].Position = XMFLOAT3(x + DIGIT_SIZE, 0.0f, 0.0f);
             vertex[1].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
             vertex[1].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[1].TexCoord = XMFLOAT2(u + w, v);
 
-            vertex[2].Position = XMFLOAT3(x, 50.0f, 0.0f);
+            vertex[2].Position = XMFLOAT3(x, DIGIT_SIZE, 0.0f);
             vertex[2].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
             vertex[2].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[2].TexCoord = XMFLOAT2(u, v + h);
 
-            vertex[3].Position = XMFLOAT3(x + 50.0f, 50.0f, 0.0f);
+            vertex[3].Position = XMFLOAT3(x + DIGIT_SIZE, DIGIT_SIZE, 0.0f);
             vertex[3].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
             vertex[3].Diffuse = XMFLOAT4(1, 1, 1, 1);
             vertex[3].TexCoord = XMFLOAT2(u + w, v + h);

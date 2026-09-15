@@ -94,13 +94,22 @@ EnemyAIConfig EnemyAIConfig::Walker()
 EnemyAIConfig EnemyAIConfig::Turret()
 {
     EnemyAIConfig config;
+    // The only one of the four that throws a wave instead of swinging, and
+    // the reason the split exists: it cannot move at all, so range is the
+    // only thing it has. The three that CAN move close to arm's length and
+    // swing, which is what their tuned ranges below already describe.
+    //
+    // The ranges here are firing distances, not reach. They have to be wide:
+    // a wave launched at arm's length is just a slower melee hit, with no
+    // flight for the player to read.
     config.CanAttack = true;
-    config.AttackRange = 1.8f;    // it cannot move, so it needs a little more reach
-    config.AttackHeight = 1.8f;
+    config.RangedAttack = true;
+    config.AttackRange = 9.0f;
+    config.AttackHeight = 3.5f;
     config.AttackCooldown = 1.8f;
     config.AttackDuration = 0.75f;
-    config.DetectRange = 2.0f;
-    config.LoseRange = 3.0f;
+    config.DetectRange = 10.0f;
+    config.LoseRange = 13.0f;
 
     // It cannot move, so it can never be "blocked" and must never give up -
     // and a thing that only guards its own spot gets to watch all round it.

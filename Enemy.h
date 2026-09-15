@@ -11,6 +11,24 @@ private:
     class EnemyAI* m_AI = nullptr;
     int m_AttackDamage = 20;
 
+    // Where a thrown wave leaves this enemy, and what it aims at, both
+    // measured up from the feet - every character here stands on its
+    // position. The enemy's body is about 1.4 tall at m_BaseScale and the
+    // player's is 1.8, so these put the shot at roughly chest to chest
+    // instead of skimming the floor.
+    const float m_MuzzleHeight = 0.9f;
+    const float m_AimHeight = 0.9f;
+
+    // The melee swing's arc. Smaller and shorter-lived than the player's
+    // 1.5 x 1.5 over 0.18s: the enemy's swing has to read as an answer to
+    // the player's, not as the same event. The arc carries no damage - the
+    // reach is CanReachTarget's business, exactly as the player's hitbox is
+    // the weapon's - so these are free to be tuned purely for readability.
+    const float m_SwingEffectReach = 0.8f;    // how far in front of the enemy
+    const float m_SwingEffectSize = 1.1f;
+    const float m_SwingEffectLifetime = 0.16f;
+    const float m_SwingEffectSweep = 1.1f;
+
     // The swing is announced before it lands. AttackTarget used to fire on
     // the same frame the AI asked for it, so there was nothing to read and
     // nothing to react to - this window is what the player parries.
@@ -27,6 +45,10 @@ private:
     const float m_AttackSlack = 0.15f;  // grace for the player edging away during the telegraph
 
     void AttackTarget();
+
+    // The one-shot arc a melee swing leaves behind. Direction is where the
+    // swing is aimed; it does not have to be normalised.
+    void SpawnSwingEffect(const Vector3& Direction);
 
     // Is the target inside this enemy's swing right now? Used twice: to
     // decide whether the telegraph is worth starting, and again when the
@@ -142,6 +164,12 @@ public:
     // Critical only changes how the damage number reads - the extra damage
     // is already in Damage by the time it gets here.
     void AddDamage(int Damage, bool Critical = false);
+
+    // A shot this enemy threw was parried on arrival. The answer is the same
+    // one a parried swing gets, and it lives here rather than in EnemyShot so
+    // both routes cannot drift apart - the stun length and the flash are this
+    // class's business.
+    void OnShotParried();
 
     // Spawn-time configuration: Manager::AddGameObj<Enemy>()->GetAI()->Configure(...)
     class EnemyAI* GetAI() const { return m_AI; }

@@ -5,6 +5,7 @@
 #include "Polygon2D.h"
 #include "input.h"
 #include "Game.h"
+#include "Loading.h"
 #include "GameObject.h"
 #include "audio.h"
 #include "Font.h"
@@ -150,7 +151,12 @@ void Title::Update()
     {
     case TitleEntry::Start:
         Game::ResetProgress();
-        Manager::ChangeScene<Game>(3.0f);
+        // Straight to the loading screen, with no fade of its own. The three
+        // second wait that used to be here ran with the title still drawn and
+        // START still lit, so the click looked like it had been missed - and
+        // the real wait, Game::Init building the map, came AFTER it. Loading
+        // puts something honest on screen and then asks for the map itself.
+        Manager::ChangeScene<Loading>(0.0f);
         break;
 
     case TitleEntry::Exit:

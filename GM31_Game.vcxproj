@@ -32,6 +32,7 @@
     <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="EnemyAI.cpp" />
     <ClCompile Include="EnemyHPBar.cpp" />
+    <ClCompile Include="EnemyShot.cpp" />
     <ClCompile Include="Explosion.cpp" />
     <ClCompile Include="field.cpp" />
     <ClCompile Include="Font.cpp" />
@@ -40,6 +41,7 @@
     <ClCompile Include="Hedge.cpp" />
     <ClCompile Include="HPBar.cpp" />
     <ClCompile Include="input.cpp" />
+    <ClCompile Include="Loading.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manager.cpp" />
     <ClCompile Include="MeshField.cpp" />
@@ -86,6 +88,7 @@
     <ClInclude Include="Enemy.h" />
     <ClInclude Include="EnemyAI.h" />
     <ClInclude Include="EnemyHPBar.h" />
+    <ClInclude Include="EnemyShot.h" />
     <ClInclude Include="Explosion.h" />
     <ClInclude Include="field.h" />
     <ClInclude Include="Font.h" />
@@ -95,6 +98,7 @@
     <ClInclude Include="Hedge.h" />
     <ClInclude Include="HPBar.h" />
     <ClInclude Include="input.h" />
+    <ClInclude Include="Loading.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="manager.h" />
     <ClInclude Include="MeshField.h" />

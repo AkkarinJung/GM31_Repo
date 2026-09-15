@@ -58,10 +58,10 @@ static const SoundDef s_Sounds[] =
     // bright, which is the right shape for it, so it stands in until there
     // is one - the same way SpecialAttack borrows the third combo swing.
     { SE::PotionPickup,  "asset\\Audio\\SFX\\Potion_Pickup.wav",       0.65f, "asset\\Audio\\SFX\\Select_Card.wav" },
-    // Picking one up and drinking it are different moments now, so they get
-    // different clips. Neither file exists yet; both fall back to something
-    // in the right register until they do.
-    { SE::PotionDrink,   "asset\\Audio\\SFX\\Potion_Drink.wav",        0.75f, "asset\\Audio\\SFX\\Select_Card.wav" },
+    // Picking one up and drinking it are different moments, so they get
+    // different clips. The drink one is real now; the pickup still falls
+    // back to the card tick until there is a file for it.
+    { SE::PotionDrink,   "asset\\Audio\\SFX\\Drink_potion.wav",        0.75f, "asset\\Audio\\SFX\\Select_Card.wav" },
 };
 
 static const int s_SoundCount = sizeof(s_Sounds) / sizeof(s_Sounds[0]);

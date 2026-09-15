@@ -12,6 +12,8 @@
 #include "Stats.h"
 #include "DamageNumber.h"
 #include "Player.h"
+#include "EnemyShot.h"
+#include "SlashEffect.h"
 #include "Collision.h"
 #include "SoundEffect.h"
 #include "ToonShader.h"
@@ -392,14 +394,50 @@ void Enemy::AttackTarget()
     if (state == EnemyState::Stunned || state == EnemyState::Dead)
         return;
 
+    // Where the attack comes from and what it is aimed at. Chest to chest,
+    // measured up from the feet - every character here stands on its
+    // position, so aiming at the target's origin would point at the floor.
+    Vector3 from = m_Position;
+    from.y += m_MuzzleHeight;
+
+    Vector3 to = target->GetPosition();
+    to.y += m_AimHeight;
+
+    Vector3 direction = to - from;
+    direction.z = 0.0f; // the play plane is XY
+
+    // ---- ranged: the damage travels -------------------------------------
+    //
+    // The wind-up says a wave is coming, the flight says where, and both
+    // dodging and parrying answer it. The parry travels with the damage:
+    // EnemyShot asks for it on arrival and calls OnShotParried() below.
+    //
+    // The wave dies at the end of this enemy's own attack range, so a shot
+    // is exactly as long as the reach the AI was allowed to fire from - it
+    // cannot sail on across the map and catch someone the enemy never had
+    // any business threatening.
+    if (m_AI->IsRangedAttack())
+    {
+        EnemyShot* shot = Manager::AddGameObj<EnemyShot>();
+        shot->Fire(this, from, direction, m_AttackDamage, m_AI->GetAttackRange());
+        return;
+    }
+
+    // ---- melee: the swing lands here, and is a one-shot arc --------------
+    //
+    // The same sprite and the same shape of call as the player's own swing
+    // (see Player::SpawnSlash): one SlashEffect, played once, which sweeps
+    // and burns out on its own. It carries no damage - exactly like the
+    // player's, where the hitbox is the weapon's business - so it can be
+    // sized for readability without touching what the swing actually hits.
+    SpawnSwingEffect(direction);
+
     // Parried: no damage, and the enemy is left open for far longer than a
     // normal hit stun.
     Player* player = dynamic_cast<Player*>(target);
     if (player != nullptr && player->TryParry(this))
     {
-        m_AI->Stun(m_ParryStunTime);
-        m_Flash = true;
-        m_ShakeTime = 0.0f;
+        OnShotParried();
         return;
     }
 
@@ -411,6 +449,47 @@ void Enemy::AttackTarget()
         if (player != nullptr)
             SoundEffect::Play(SE::PlayerHurt);
     }
+}
+
+void Enemy::SpawnSwingEffect(const Vector3& Direction)
+{
+    Vector3 direction = Direction;
+    direction.z = 0.0f;
+
+    float length = direction.lenght();
+
+    if (length < 0.0001f)
+        direction = Vector3(m_AI->GetFacing() >= 0.0f ? 1.0f : -1.0f, 0.0f, 0.0f);
+    else
+        direction /= length;
+
+    // In front of the enemy rather than inside it, so the arc reads as a
+    // swing rather than as a flash on its chest.
+    Vector3 position = m_Position;
+    position.y += m_MuzzleHeight;
+    position += direction * m_SwingEffectReach;
+
+    // The crescent is drawn already bulging along +X, so pointing it down
+    // the swing's direction is just its angle. The player needs a
+    // hand-authored roll table because a three step combo has three
+    // different arcs; this has one.
+    float roll = atan2f(direction.y, direction.x);
+
+    // The sweep flips with the facing, so the blade always travels the way
+    // the enemy is swinging rather than back into itself.
+    float facing = (direction.x < 0.0f) ? -1.0f : 1.0f;
+
+    SlashEffect* slash = Manager::AddGameObj<SlashEffect>();
+    slash->Play(position, Vector3(0.0f, 0.0f, roll),
+        Vector3(m_SwingEffectSize, m_SwingEffectSize, 1.0f),
+        m_SwingEffectLifetime, 1.0f, facing * m_SwingEffectSweep);
+}
+
+void Enemy::OnShotParried()
+{
+    m_AI->Stun(m_ParryStunTime);
+    m_Flash = true;
+    m_ShakeTime = 0.0f;
 }
 
 // The popup is tinted through Material.Diffuse, which multiplies the digit
