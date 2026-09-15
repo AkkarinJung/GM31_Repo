@@ -19,6 +19,15 @@
 //    enemy spawned inside that span starts embedded in it, so every ground
 //    spawn below sits in a gap.
 //
+//  * A FLIER spawns with y above the ground (3.0 below) - the AI drives it to
+//    its own hover height from there, but starting it in the air keeps it
+//    from being shoved about by the ground crowd on its first frame. A crate
+//    underneath one is harmless: it flies over everything.
+//
+//  * A TURRET cannot move at all, so where it is placed is the whole of its
+//    behaviour. It is the only type that throws a wave, and its range is 9,
+//    so it is put where the player has ground to cross in front of it.
+//
 //  * An enemy spawned on a crate has y = that crate's top, and x inside the
 //    crate's span. Only the wide crates carry one - a walker patrols four
 //    units each way, so a 4-wide crate would just walk it off the edge.
@@ -64,6 +73,11 @@ static const EnemySpawn s_Stage1Enemies[] =
     { EnemyType::Walker, {  6.0f, 0.0f, 0.0f } },
     { EnemyType::Walker, { 19.0f, 0.0f, 0.0f } },
     { EnemyType::Walker, { 33.0f, 0.0f, 0.0f } },
+    // The flier, last, once the swing and the jump have both been used. It
+    // hovers above its target and out of reach of a swing taken standing up,
+    // so it is the first thing that has to be jumped at rather than walked
+    // into - which is why it arrives after the crate has taught the jump.
+    { EnemyType::Flyer,  { 27.0f, 3.0f, 0.0f } },
 };
 
 static const BoxSpawn s_Stage1Boxes[] =
@@ -83,11 +97,17 @@ static const CrateSpawn s_Stage1Crates[] =
 // at x 8..12 is the first thing that breaks line of sight.
 static const EnemySpawn s_Stage2Enemies[] =
 {
-    { EnemyType::Walker, { -4.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, { 17.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, { 26.0f, 2.0f, 0.0f } }, // on the platform
-    { EnemyType::Walker, { 35.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, { 48.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { -4.0f, 0.0f, 0.0f } },
+    { EnemyType::Flyer,     { 10.0f, 3.0f, 0.0f } },
+    { EnemyType::Walker,    { 17.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { 26.0f, 2.0f, 0.0f } }, // on the platform
+    { EnemyType::Walker,    { 35.0f, 0.0f, 0.0f } },
+    // The first turret. It cannot move and it is the only type that throws a
+    // wave, so it turns the ground in front of it into something to cross
+    // rather than something to walk over - and it is placed at the far end,
+    // where there is room to see the shots coming.
+    { EnemyType::Turret,    { 46.5f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { 48.0f, 0.0f, 0.0f } },
 };
 
 static const BoxSpawn s_Stage2Boxes[] =
@@ -108,12 +128,18 @@ static const CrateSpawn s_Stage2Crates[] =
 // player's start so the map is not a single corridor running right.
 static const EnemySpawn s_Stage3Enemies[] =
 {
-    { EnemyType::Walker, { -20.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {   4.5f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  21.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  31.0f, 2.5f, 0.0f } }, // holds the high ground
-    { EnemyType::Walker, {  42.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  58.0f, 0.0f, 0.0f } },
+    // Guarding the pocket behind the start, which is otherwise a free corner.
+    { EnemyType::Patroller, { -24.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { -20.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {   4.5f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  21.0f, 0.0f, 0.0f } },
+    { EnemyType::Flyer,     {  24.0f, 3.0f, 0.0f } },
+    { EnemyType::Walker,    {  31.0f, 2.5f, 0.0f } }, // holds the high ground
+    { EnemyType::Walker,    {  42.0f, 0.0f, 0.0f } },
+    // Covering the approach to the last crate, so the high ground has to be
+    // taken under fire rather than at leisure.
+    { EnemyType::Turret,    {  54.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  58.0f, 0.0f, 0.0f } },
 };
 
 static const BoxSpawn s_Stage3Boxes[] =
@@ -137,14 +163,17 @@ static const CrateSpawn s_Stage3Crates[] =
 // waves rather than all at the start.
 static const EnemySpawn s_Stage4Enemies[] =
 {
-    { EnemyType::Walker, { -24.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  -8.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  18.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  26.0f, 2.0f, 0.0f } }, // on the first platform
-    { EnemyType::Walker, {  34.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  54.0f, 2.0f, 0.0f } }, // on the second
-    { EnemyType::Walker, {  63.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  73.0f, 0.0f, 0.0f } },
+    { EnemyType::Patroller, { -28.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { -24.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  -8.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  18.0f, 0.0f, 0.0f } },
+    { EnemyType::Turret,    {  20.0f, 0.0f, 0.0f } }, // in the gap before the platform
+    { EnemyType::Walker,    {  26.0f, 2.0f, 0.0f } }, // on the first platform
+    { EnemyType::Walker,    {  34.0f, 0.0f, 0.0f } },
+    { EnemyType::Flyer,     {  46.0f, 3.0f, 0.0f } },
+    { EnemyType::Walker,    {  54.0f, 2.0f, 0.0f } }, // on the second
+    { EnemyType::Walker,    {  63.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  73.0f, 0.0f, 0.0f } },
 };
 
 static const BoxSpawn s_Stage4Boxes[] =
@@ -171,16 +200,21 @@ static const CrateSpawn s_Stage4Crates[] =
 // at a time, and hold ground on the long crate in the middle.
 static const EnemySpawn s_Stage5Enemies[] =
 {
-    { EnemyType::Walker, { -30.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, { -14.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {   4.5f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  21.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  30.0f, 2.5f, 0.0f } }, // the high middle
-    { EnemyType::Walker, {  40.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  52.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  60.0f, 2.0f, 0.0f } }, // the second platform
-    { EnemyType::Walker, {  68.0f, 0.0f, 0.0f } },
-    { EnemyType::Walker, {  80.0f, 0.0f, 0.0f } },
+    { EnemyType::Patroller, { -34.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { -30.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    { -14.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {   4.5f, 0.0f, 0.0f } },
+    { EnemyType::Flyer,     {  20.0f, 3.0f, 0.0f } },
+    { EnemyType::Walker,    {  21.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  30.0f, 2.5f, 0.0f } }, // the high middle
+    { EnemyType::Turret,    {  38.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  40.0f, 0.0f, 0.0f } },
+    { EnemyType::Flyer,     {  50.0f, 3.0f, 0.0f } },
+    { EnemyType::Walker,    {  52.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  60.0f, 2.0f, 0.0f } }, // the second platform
+    { EnemyType::Walker,    {  68.0f, 0.0f, 0.0f } },
+    { EnemyType::Turret,    {  70.0f, 0.0f, 0.0f } },
+    { EnemyType::Walker,    {  80.0f, 0.0f, 0.0f } },
 };
 
 static const BoxSpawn s_Stage5Boxes[] =

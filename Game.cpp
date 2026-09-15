@@ -84,6 +84,25 @@ static float StageScale(int Stage, float PerStage)
 	return 1.0f + Stage * PerStage;
 }
 
+// Which mesh each type wears. The flyer is the one that is not a rabbit -
+// a bee sells "hovers and comes at you through the air" in a way a ground
+// animal lifted off the floor never did.
+//
+// Enemy::LoadModel picks its loader from the extension and fits an FBX to
+// the collision body itself, so a new model only has to be dropped in and
+// named here - no size to guess and no second code path.
+static const char* ModelForType(EnemyType Type)
+{
+	switch (Type)
+	{
+	case EnemyType::Flyer: return "asset\\model\\Bee\\Bee.fbx";
+	case EnemyType::Patroller:
+	case EnemyType::Walker:
+	case EnemyType::Turret:
+	default:               return "asset\\model\\Rabbit\\rabbit_1.obj";
+	}
+}
+
 // How hard each type is to shove around. A turret is a fixed emplacement
 // and barely budges; a flier is light enough to knock aside.
 static float MassForType(EnemyType Type)
@@ -361,6 +380,7 @@ void Game::Init()
 
 		Enemy* enemy = Manager::AddGameObj<Enemy>();
 		enemy->SetPosition(spawn.Position);
+		enemy->LoadModel(ModelForType(spawn.Type));
 		enemy->GetAI()->Configure(ConfigForType(spawn.Type));
 		enemy->SetMass(MassForType(spawn.Type));
 

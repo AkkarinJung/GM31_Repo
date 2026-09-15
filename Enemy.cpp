@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "Enemy.h"
 #include "modelRenderer.h"
+#include "animationModel.h"
 #include "manager.h"
 #include "Explosion.h"
 #include "Camera.h"
@@ -20,6 +21,40 @@
 #include <algorithm>
 #define NOMINMAX
 #include <cmath>
+#include <cstring>
+#include <cctype>
+
+// What an enemy wears when the spawner does not say. Also the size every
+// model is fitted to: the collision body is 1.4 tall (m_BodyHalfSize.y is
+// 0.7 either way of the feet), so a mesh matched to it means what the player
+// swings at is what the player can see.
+static const char* const DEFAULT_ENEMY_MODEL = "asset\\model\\Rabbit\\rabbit_1.obj";
+static const float ENEMY_MODEL_HEIGHT = 1.4f;
+
+// Case insensitive, because ".obj" and ".OBJ" name the same kind of file and
+// a model that silently took the wrong loader would just fail to appear.
+static bool HasExtension(const char* FileName, const char* Extension)
+{
+    if (FileName == nullptr)
+        return false;
+
+    const char* dot = strrchr(FileName, '.');
+
+    if (dot == nullptr)
+        return false;
+
+    while (*dot != '\0' && *Extension != '\0')
+    {
+        if (tolower((unsigned char)*dot) != tolower((unsigned char)*Extension))
+            return false;
+
+        dot++;
+        Extension++;
+    }
+
+    return *dot == *Extension; // both ended together, or neither did
+}
+
 
 void Enemy::Init()
 {
@@ -38,8 +73,9 @@ void Enemy::Init()
     m_AI = AddGameComponent<EnemyAI>(this);
     m_AI->Configure(EnemyAIConfig::Patroller());
 
-    m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
-    m_ModelRenderer->Load("asset\\model\\Rabbit\\rabbit_1.obj");
+    // No model here. The spawner chooses it per enemy type and calls
+    // LoadModel immediately after building this object, before anything is
+    // drawn - Draw falls back to the default if it somehow did not.
 
 
     // The toon shader and its ramp are shared - see ToonShader.
@@ -167,8 +203,7 @@ void Enemy::Update()
     // pulse brightens as the strike closes in - that is the tell.
     if (m_Flash)
     {
-        m_ModelRenderer->SetFlashColor(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-        m_ModelRenderer->SetFlash(true);
+        SetModelFlash(true, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     }
     else if (m_AttackPending && m_AttackWindupTime > 0.0f)
     {
@@ -176,12 +211,11 @@ void Enemy::Update()
         float pulse = fabsf(sinf(t * XM_PI * 3.0f));
         float alpha = 0.25f + 0.75f * (t * 0.6f + pulse * 0.4f);
 
-        m_ModelRenderer->SetFlashColor(XMFLOAT4(1.0f, 0.15f, 0.15f, alpha));
-        m_ModelRenderer->SetFlash(true);
+        SetModelFlash(true, XMFLOAT4(1.0f, 0.15f, 0.15f, alpha));
     }
     else
     {
-        m_ModelRenderer->SetFlash(false);
+        SetModelFlash(false, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     }
 
     m_Time += dt;
@@ -328,14 +362,23 @@ void Enemy::Draw()
     shadowPos.y = 0.01f;
     m_Shadow->SetPosition(shadowPos);
 
+    // Nothing gave this enemy a mesh. Only reachable if a future spawner
+    // forgets LoadModel; done here rather than in Update because Update does
+    // not run while the reward pick has the game paused, and an invisible
+    // enemy through that whole screen would look like a bug.
+    if (m_ModelRenderer == nullptr && m_AnimationModel == nullptr)
+        LoadModel(DEFAULT_ENEMY_MODEL);
+
     ToonShader::Bind(ToonShader::CharacterLook);
 
-    // The hit wobble goes on here and comes straight back off, so the world
-    // matrix shakes and m_Position does not. Everything that reads the
-    // enemy's position - the AI, the sword, the separation, the shadow -
-    // keeps seeing where the enemy actually is.
+    // The hit wobble and the model's stand-on-its-feet offset both go on
+    // here and come straight back off, so the world matrix carries them and
+    // m_Position does not. Everything that reads the enemy's position - the
+    // AI, the sword, the separation, the shadow - keeps seeing where the
+    // enemy actually is.
     Vector3 truePosition = m_Position;
     m_Position += m_ShakeOffset;
+    m_Position.y += m_ModelOffsetY;
 
     GameObject::Draw();
 
@@ -484,6 +527,63 @@ void Enemy::SpawnSwingEffect(const Vector3& Direction)
     slash->Play(position, Vector3(0.0f, 0.0f, roll),
         Vector3(m_SwingEffectSize, m_SwingEffectSize, 1.0f),
         m_SwingEffectLifetime, 1.0f, facing * m_SwingEffectSweep);
+}
+
+void Enemy::LoadModel(const char* FileName)
+{
+    if (FileName == nullptr)
+        return;
+
+    // First call wins. A GameObject cannot drop a component once it has one,
+    // so a second mesh would draw on top of the first rather than replace it.
+    if (m_ModelRenderer != nullptr || m_AnimationModel != nullptr)
+        return;
+
+    // ModelRenderer only parses Wavefront OBJ; anything else goes through
+    // assimp, which is what AnimationModel wraps. The same split Box, Sword,
+    // Hedge and Prop all make - it is the file that decides, not the caller.
+    if (HasExtension(FileName, ".obj"))
+    {
+        m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
+        m_ModelRenderer->Load(FileName);
+        return;
+    }
+
+    m_AnimationModel = AddGameComponent<AnimationModel>(this);
+    m_AnimationModel->Load(FileName);
+
+    // Measure what actually loaded and fit it to the collision body, rather
+    // than trusting a new model to arrive at the right scale. m_BaseScale is
+    // what the squash and stretch in Update works off, so setting it here
+    // keeps that animation proportional to whatever size the mesh needed.
+    XMFLOAT3 boundsMin = m_AnimationModel->GetBoundsMin();
+    XMFLOAT3 boundsMax = m_AnimationModel->GetBoundsMax();
+
+    float height = boundsMax.y - boundsMin.y;
+
+    if (height > 0.0001f)
+        m_BaseScale = ENEMY_MODEL_HEIGHT / height;
+
+    // Stand it on its feet. Positions here are at the feet, so a mesh built
+    // around its own middle would sink half of itself into the floor.
+    m_ModelOffsetY = -boundsMin.y * m_BaseScale;
+
+    m_Scale = { m_BaseScale, m_BaseScale, m_BaseScale };
+}
+
+void Enemy::SetModelFlash(bool Flash, const XMFLOAT4& Colour)
+{
+    if (m_ModelRenderer != nullptr)
+    {
+        m_ModelRenderer->SetFlashColor(Colour);
+        m_ModelRenderer->SetFlash(Flash);
+    }
+
+    if (m_AnimationModel != nullptr)
+    {
+        m_AnimationModel->SetFlashColor(Colour);
+        m_AnimationModel->SetFlash(Flash);
+    }
 }
 
 void Enemy::ScaleForStage(float HPScale, float DamageScale)

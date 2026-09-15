@@ -53,6 +53,9 @@ private:
 	XMFLOAT3 m_BoundsMin{ 0.0f, 0.0f, 0.0f };
 	XMFLOAT3 m_BoundsMax{ 0.0f, 0.0f, 0.0f };
 
+	bool m_Flash = false;
+	XMFLOAT4 m_FlashColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+
 	void CreateBone(aiNode* Node);
 	void CollectMeshTransforms(aiNode* Node, const aiMatrix4x4& ParentMatrix);
 	void UpdateBoneMatrix(aiNode* Node, aiMatrix4x4 Matrix);
@@ -64,6 +67,14 @@ public:
 
 	XMFLOAT3 GetBoundsMin() const { return m_BoundsMin; }
 	XMFLOAT3 GetBoundsMax() const { return m_BoundsMax; }
+
+	// Flat colour override, the same pair ModelRenderer already has and
+	// implemented the same way - Enemy drives both off one code path, so an
+	// FBX enemy flashes white when hurt and pulses red on its wind-up exactly
+	// like an OBJ one. Without this the tell simply would not appear on a
+	// model that happens to be an FBX.
+	void SetFlash(bool Flash) { m_Flash = Flash; }
+	void SetFlashColor(const XMFLOAT4& Color) { m_FlashColor = Color; }
 	void LoadAnimation( const char *FileName, const char *Name );
 	void Uninit() override;
 	void Update(const char* AnimationName1, int Frame1,

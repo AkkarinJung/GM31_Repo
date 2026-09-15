@@ -23,21 +23,37 @@
 
 			// ƒ}ƒeƒŠƒAƒ‹Ý’è
 			aiString texture;
-			aiColor3D diffuse;
-			float opacity;
+
+			// BOTH of these must be initialised. assimp leaves the value
+			// untouched when a material has no such key, and a material
+			// without an Opacity property is completely ordinary - Bee.fbx
+			// has only a DiffuseColor. Read uninitialised, the opacity became
+			// whatever was on the stack, and a value at or below zero put the
+			// mesh's alpha at zero: the model loaded, drew, and was invisible.
+			aiColor3D diffuse(1.0f, 1.0f, 1.0f);
+			float opacity = 1.0f;
 
 			aiMaterial* aimaterial = m_AiScene->mMaterials[mesh->mMaterialIndex];
 			aimaterial->GetTexture(aiTextureType_DIFFUSE, 0, &texture);
 			aimaterial->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
 			aimaterial->Get(AI_MATKEY_OPACITY, opacity);
 
-			if (texture == aiString(""))
+			// m_Texture[...] would DEFAULT CONSTRUCT a null entry for a name
+			// that is not in the map and bind that, which samples to zero and
+			// takes the mesh with it. A material naming a texture the model
+			// did not ship - Bee.fbx points at an absolute path on the
+			// artist's own machine - has to fall back to its flat colour
+			// instead of disappearing.
+			std::unordered_map<std::string, ID3D11ShaderResourceView*>::const_iterator found =
+				(texture == aiString("")) ? m_Texture.end() : m_Texture.find(texture.data);
+
+			if (found == m_Texture.end() || found->second == nullptr)
 			{
 				material.TextureEnable = false;
 			}
 			else
 			{
-				Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &m_Texture[texture.data]);
+				Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &found->second);
 				material.TextureEnable = true;
 			}
 
@@ -130,7 +146,14 @@
 						m_BoundsMax.z = std::max(m_BoundsMax.z, position.z);
 					}
 					vertex[v].Normal = XMFLOAT3(normal.x, normal.y, normal.z);
-					vertex[v].TexCoord = XMFLOAT2(mesh->mTextureCoords[0][v].x, mesh->mTextureCoords[0][v].y);
+					// A mesh can genuinely have no UV channel - Bee.fbx carries a
+					// second, flat piece of geometry that has none - and
+					// mTextureCoords[0] is then null. Dereferencing it is a
+					// crash, not a missing texture.
+					if (mesh->mTextureCoords[0] != nullptr)
+						vertex[v].TexCoord = XMFLOAT2(mesh->mTextureCoords[0][v].x, mesh->mTextureCoords[0][v].y);
+					else
+						vertex[v].TexCoord = XMFLOAT2(0.0f, 0.0f);
 					vertex[v].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 				}
 
@@ -244,6 +267,68 @@
 			assert(texture);
 
 			m_Texture[aitexture->mFilename.data] = texture;
+		}
+
+		// Textures that live in a FILE rather than inside the FBX.
+		//
+		// The loop above only covers textures embedded in the model, which is
+		// what every asset here happened to use until now. An FBX exported
+		// with its texture left on disk stores a path instead - and often an
+		// absolute one from whatever machine it was authored on, which cannot
+		// mean anything here. Bee.fbx points at a Downloads folder on the
+		// artist's PC.
+		//
+		// So the name is tried next to the MODEL first, which is where a
+		// texture shipped alongside its .fbx actually is, and only then as
+		// written. A texture that is found nowhere is left out of the map
+		// entirely - Draw falls back to the material's flat colour, rather
+		// than binding nothing and drawing nothing.
+		std::string modelDir;
+		{
+			size_t slash = modelPath.find_last_of("\\/");
+			if (slash != std::string::npos)
+				modelDir = modelPath.substr(0, slash + 1);
+		}
+
+		for (unsigned int i = 0; i < m_AiScene->mNumMaterials; i++)
+		{
+			aiString path;
+
+			if (m_AiScene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE, 0, &path) != AI_SUCCESS)
+				continue;
+
+			if (path.length == 0 || m_Texture.count(path.data) > 0)
+				continue;
+
+			std::string stored(path.data);
+
+			size_t slash = stored.find_last_of("\\/");
+			std::string leaf = (slash == std::string::npos) ? stored : stored.substr(slash + 1);
+
+			const std::string candidates[] = { modelDir + leaf, stored };
+
+			for (int c = 0; c < 2; c++)
+			{
+				std::wstring wide(candidates[c].begin(), candidates[c].end());
+
+				TexMetadata metadata;
+				ScratchImage image;
+
+				if (FAILED(LoadFromWICFile(wide.c_str(), WIC_FLAGS_NONE, &metadata, image)))
+					continue;
+
+				ID3D11ShaderResourceView* texture = nullptr;
+				CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+					image.GetImageCount(), metadata, &texture);
+
+				if (texture != nullptr)
+				{
+					// Keyed by what the MATERIAL says, because that is what
+					// Draw looks up - not by the path it was found at.
+					m_Texture[stored] = texture;
+					break;
+				}
+			}
 		}
 
 

@@ -55,26 +55,42 @@ void PotionSlotUI::Init()
     // The bottles. Authored at 32x32 and supplied at 4x; the slot draws them
     // at whatever CONTENT_INSET leaves, so the extra resolution is just there
     // to survive a bigger slot later.
-    TexMetadata metadata;
-    ScratchImage image;
+    //
+    // One metadata/image pair each, the way ControlsUI and HPBar load their
+    // two textures. Sharing one pair across both calls is the only thing
+    // here that differed from the loaders known to work, and it is not worth
+    // being the odd one out over.
+    TexMetadata healthMetadata;
+    ScratchImage healthImage;
 
     if (SUCCEEDED(LoadFromWICFile(L"asset\\texture\\potion_hp_128.png",
-        WIC_FLAGS_NONE, &metadata, image)))
+        WIC_FLAGS_NONE, &healthMetadata, healthImage)))
     {
-        CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
-            image.GetImageCount(), metadata, &m_HealthIcon);
+        CreateShaderResourceView(Renderer::GetDevice(), healthImage.GetImages(),
+            healthImage.GetImageCount(), healthMetadata, &m_HealthIcon);
     }
+
+    TexMetadata manaMetadata;
+    ScratchImage manaImage;
 
     if (SUCCEEDED(LoadFromWICFile(L"asset\\texture\\potion_mp_128.png",
-        WIC_FLAGS_NONE, &metadata, image)))
+        WIC_FLAGS_NONE, &manaMetadata, manaImage)))
     {
-        CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
-            image.GetImageCount(), metadata, &m_ManaIcon);
+        CreateShaderResourceView(Renderer::GetDevice(), manaImage.GetImages(),
+            manaImage.GetImageCount(), manaMetadata, &m_ManaIcon);
     }
 
-    // Deliberately not asserted. Every other texture in the project asserts,
-    // but a missing potion icon is not worth killing the build over - the
-    // slot falls back to the coloured square it used to draw.
+    // These DO assert, like every other texture in the project.
+    //
+    // They were deliberately left un-asserted at first, on the grounds that a
+    // missing icon is not worth killing the build over - the slot falls back
+    // to the coloured square it used to draw. That was a mistake: the
+    // fallback looks exactly like the icons never having been added, so a
+    // file that fails to load reads as "the change is gone" instead of as a
+    // missing file. The graceful fallback stays for release builds; this just
+    // makes the real cause impossible to miss in a debug one.
+    assert(m_HealthIcon);
+    assert(m_ManaIcon);
 }
 
 void PotionSlotUI::Uninit()

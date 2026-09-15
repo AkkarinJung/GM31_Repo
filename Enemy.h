@@ -127,7 +127,20 @@ private:
     // live in ToonShader now - the scenery wanted the same look, and a copy
     // per object would have meant hundreds of them. See ToonShader::Bind.
 
-    class ModelRenderer* m_ModelRenderer;
+    // One of these two, never both. ModelRenderer parses Wavefront OBJ and
+    // AnimationModel goes through assimp, so which one an enemy gets is
+    // decided by the file it is given - see LoadModel. Everything else talks
+    // to whichever exists through SetModelFlash.
+    class ModelRenderer* m_ModelRenderer = nullptr;
+    class AnimationModel* m_AnimationModel = nullptr;
+
+    // Lifts the drawn mesh so it stands on m_Position like every other
+    // character here. Measured from an FBX's own bounds, because a model
+    // built around its middle would otherwise sink halfway into the floor.
+    float m_ModelOffsetY = 0.0f;
+
+    // Drives the flash on whichever model component this enemy has.
+    void SetModelFlash(bool Flash, const XMFLOAT4& Colour);
 
     // Hit wobble. This is a DRAW offset and nothing else - m_Position is
     // never written by it.
@@ -177,6 +190,17 @@ public:
     // anything reads its stats. Both multipliers are against the base
     // values, so calling it twice with the same numbers changes nothing.
     void ScaleForStage(float HPScale, float DamageScale);
+
+    // The mesh this enemy wears. Called by the spawner right after the
+    // object is built, before anything draws. An .obj goes through
+    // ModelRenderer and anything else through AnimationModel; an FBX is also
+    // measured and scaled to match the collision body, so a new model does
+    // not have to be authored at any particular size to look right.
+    //
+    // Only the first call does anything - a GameObject cannot drop a
+    // component once it has one, so a second mesh would simply draw on top
+    // of the first.
+    void LoadModel(const char* FileName);
 
     // A shot this enemy threw was parried on arrival. The answer is the same
     // one a parried swing gets, and it lives here rather than in EnemyShot so
