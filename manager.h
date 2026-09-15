@@ -26,6 +26,18 @@ public:
 		m_NextScene = new T();
 	}
 
+	static void ChangeScene(Scene* NextScene)
+	{
+		if (m_NextScene != nullptr)
+		{
+			return;
+		}
+		else {
+			m_ChangeTime = 0.0f;
+			m_NextScene = NextScene;
+		}
+	}
+
 	template<typename T>
 	static T* AddGameObj()
 	{

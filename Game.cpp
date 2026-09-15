@@ -21,6 +21,7 @@
 
 #include "GameObject.h"
 #include "Result.h"
+#include "Fade.h"
 
 
 void Game::Init()
@@ -86,6 +87,8 @@ void Game::Init()
 	Manager::AddGameObj<Particle>()->SetPosition({ -2.0f,1.0f,-1.0f });
 
 	Manager::AddGameObj<Score>()->SetPosition({ 100.0f,100.0f,0.0f });
+
+	Manager::AddGameObj<Fade>()->Init(false, nullptr);
 }
 
 
