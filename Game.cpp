@@ -16,6 +16,7 @@
 #include "Tree.h"
 #include "Grass.h"
 #include "Box.h"
+#include "Crate.h"
 #include "SkyDome.h"
 #include "input.h"
 #include "Score.h"
@@ -343,6 +344,17 @@ void Game::Init()
 		Box* box = Manager::AddGameObj<Box>();
 		box->SetPosition(spawn.Position);
 		box->SetScale(spawn.Scale);
+	}
+
+	// Breakable crates. Unlike the platforms above these carry no size - they
+	// are all one unit, and what each one drops is rolled when it breaks, so
+	// the layout only ever says where.
+	for (int i = 0; i < stage.CrateCount; i++)
+	{
+		const CrateSpawn& spawn = stage.Crates[i];
+
+		Crate* crate = Manager::AddGameObj<Crate>();
+		crate->SetPosition(spawn.Position);
 	}
 
 	//Manager::AddGameObj<Grass>()->SetPosition({ 10.0f,0.0f,-5.0f });

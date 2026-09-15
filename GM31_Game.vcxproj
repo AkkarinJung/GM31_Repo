@@ -27,6 +27,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="ControlsUI.cpp" />
+    <ClCompile Include="Crate.cpp" />
     <ClCompile Include="DamageNumber.cpp" />
     <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="EnemyAI.cpp" />
@@ -46,6 +47,7 @@
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Polygon2D.cpp" />
+    <ClCompile Include="Potion.cpp" />
     <ClCompile Include="Prop.cpp" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="Result.cpp" />
@@ -76,6 +78,7 @@
     <ClInclude Include="Collision.h" />
     <ClInclude Include="component.h" />
     <ClInclude Include="ControlsUI.h" />
+    <ClInclude Include="Crate.h" />
     <ClInclude Include="DamageNumber.h" />
     <ClInclude Include="DirectXTex\DirectXTex.h" />
     <ClInclude Include="Enemy.h" />
@@ -97,6 +100,7 @@
     <ClInclude Include="Particle.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Polygon2D.h" />
+    <ClInclude Include="Potion.h" />
     <ClInclude Include="Prop.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="Result.h" />

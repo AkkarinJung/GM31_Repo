@@ -33,6 +33,24 @@
 //    tall      Scale {2, 1.25, 2}   4 wide, top 2.5   the highest climbable
 //    platform  Scale {4, 1.00, 2}   8 wide, top 2.0   room to stand and fight
 //    long      Scale {5, 1.25, 2}  10 wide, top 2.5   high ground, holds a fight
+//
+// Breakable crates (s_StageNCrates) are a different thing from the platforms
+// above, despite the shared name - they are one unit across, they are solid
+// until the player breaks them, and each one rolls the drop table in
+// Crate::Break. Placement rules, all checked against the layouts above:
+//
+//  * A breakable covers x from Position.x - 0.5 to Position.x + 0.5. It never
+//    overlaps a platform's span, or it would spawn embedded in one.
+//
+//  * It keeps clear of every enemy spawn, so a fight never opens with a crate
+//    already inside the enemy.
+//
+//  * Nothing sits within four units of x = 0, the same rule the enemies
+//    follow - the player should not start the stage inside the scenery.
+//
+// The count grows with the stage, from four to ten. HP carries between stages
+// now (see Game::s_CarriedHP), so the later maps need more places to top it
+// back up than the early ones do.
 
 // ---------------------------------------------------------------- STAGE 1
 // Flat and open, one crate. Teaches the swing and the jump with nothing else
@@ -48,6 +66,14 @@ static const BoxSpawn s_Stage1Boxes[] =
 {
     { { 12.0f, 0.0f, 0.0f }, { 2.0f, 0.75f, 2.0f } }, // step,  x 10..14
     { { 26.0f, 0.0f, 0.0f }, { 2.0f, 1.00f, 2.0f } }, // block, x 24..28
+};
+
+static const CrateSpawn s_Stage1Crates[] =
+{
+    { {  -6.0f, 0.0f, 0.0f } },
+    { {   4.0f, 0.0f, 0.0f } },
+    { {  16.5f, 0.0f, 0.0f } },
+    { {  30.5f, 0.0f, 0.0f } },
 };
 
 // ---------------------------------------------------------------- STAGE 2
@@ -70,6 +96,15 @@ static const BoxSpawn s_Stage2Boxes[] =
     { { 42.0f, 0.0f, 0.0f }, { 2.0f, 0.75f, 2.0f } }, // step,     x 40..44
 };
 
+static const CrateSpawn s_Stage2Crates[] =
+{
+    { { -12.0f, 0.0f, 0.0f } },
+    { {   4.0f, 0.0f, 0.0f } },
+    { {  14.5f, 0.0f, 0.0f } },
+    { {  32.0f, 0.0f, 0.0f } },
+    { {  46.0f, 0.0f, 0.0f } },
+};
+
 // ---------------------------------------------------------------- STAGE 3
 // A staircase up to the high ground in the middle, and a pocket behind the
 // player's start so the map is not a single corridor running right.
@@ -90,6 +125,16 @@ static const BoxSpawn s_Stage3Boxes[] =
     { {  15.0f, 0.0f, 0.0f }, { 2.0f, 1.25f, 2.0f } }, // tall,  x  13..17  (the step above pairs with this)
     { {  31.0f, 0.0f, 0.0f }, { 5.0f, 1.25f, 2.0f } }, // long,  x  26..36
     { {  50.0f, 0.0f, 0.0f }, { 2.0f, 1.00f, 2.0f } }, // block, x  48..52
+};
+
+static const CrateSpawn s_Stage3Crates[] =
+{
+    { { -24.0f, 0.0f, 0.0f } },
+    { {  -7.0f, 0.0f, 0.0f } },
+    { {  11.5f, 0.0f, 0.0f } }, // the gap between the block and the tall
+    { {  23.5f, 0.0f, 0.0f } },
+    { {  45.0f, 0.0f, 0.0f } },
+    { {  54.5f, 0.0f, 0.0f } },
 };
 
 // ---------------------------------------------------------------- STAGE 4
@@ -117,6 +162,18 @@ static const BoxSpawn s_Stage4Boxes[] =
     { {  40.0f, 0.0f, 0.0f }, { 2.0f, 1.25f, 2.0f } }, // tall,     x  38..42
     { {  54.0f, 0.0f, 0.0f }, { 5.0f, 1.00f, 2.0f } }, // long,     x  49..59
     { {  68.0f, 0.0f, 0.0f }, { 2.0f, 0.75f, 2.0f } }, // step,     x  66..70
+};
+
+static const CrateSpawn s_Stage4Crates[] =
+{
+    { { -28.0f, 0.0f, 0.0f } },
+    { { -11.0f, 0.0f, 0.0f } },
+    { {   8.5f, 0.0f, 0.0f } },
+    { {  20.0f, 0.0f, 0.0f } },
+    { {  32.0f, 0.0f, 0.0f } },
+    { {  36.0f, 0.0f, 0.0f } }, // pairs with the one above, either side of the enemy at 34
+    { {  45.0f, 0.0f, 0.0f } },
+    { {  61.0f, 0.0f, 0.0f } },
 };
 
 // ---------------------------------------------------------------- STAGE 5
@@ -151,18 +208,33 @@ static const BoxSpawn s_Stage5Boxes[] =
     { {  86.0f, 0.0f, 0.0f }, { 2.0f, 0.75f, 2.0f } }, // step,     x  84..88
 };
 
+static const CrateSpawn s_Stage5Crates[] =
+{
+    { { -34.0f, 0.0f, 0.0f } },
+    { { -17.0f, 0.0f, 0.0f } },
+    { { -11.0f, 0.0f, 0.0f } },
+    { {  12.5f, 0.0f, 0.0f } },
+    { {  23.0f, 0.0f, 0.0f } },
+    { {  38.0f, 0.0f, 0.0f } },
+    { {  42.0f, 0.0f, 0.0f } },
+    { {  66.0f, 0.0f, 0.0f } },
+    { {  82.0f, 0.0f, 0.0f } },
+    { {  90.0f, 0.0f, 0.0f } },
+};
+
 // The run, in order. Add a stage by adding a line here - Game::Update reads
 // GetStageCount(), so nothing else needs touching.
 //
-// Name, map left, map right, enemies, boxes. The maps get wider as the run
+// Name, map left, map right, enemies, boxes, breakable crates. The maps get
+// wider as the run
 // goes on: 60 units, then 76, 92, 108 and 128.
 static const StageData s_Stages[] =
 {
-    { "STAGE 1", -20.0f, 40.0f, s_Stage1Enemies, COUNT_OF(s_Stage1Enemies), s_Stage1Boxes, COUNT_OF(s_Stage1Boxes) },
-    { "STAGE 2", -24.0f, 52.0f, s_Stage2Enemies, COUNT_OF(s_Stage2Enemies), s_Stage2Boxes, COUNT_OF(s_Stage2Boxes) },
-    { "STAGE 3", -28.0f, 64.0f, s_Stage3Enemies, COUNT_OF(s_Stage3Enemies), s_Stage3Boxes, COUNT_OF(s_Stage3Boxes) },
-    { "STAGE 4", -32.0f, 76.0f, s_Stage4Enemies, COUNT_OF(s_Stage4Enemies), s_Stage4Boxes, COUNT_OF(s_Stage4Boxes) },
-    { "STAGE 5", -36.0f, 92.0f, s_Stage5Enemies, COUNT_OF(s_Stage5Enemies), s_Stage5Boxes, COUNT_OF(s_Stage5Boxes) },
+    { "STAGE 1", -20.0f, 40.0f, s_Stage1Enemies, COUNT_OF(s_Stage1Enemies), s_Stage1Boxes, COUNT_OF(s_Stage1Boxes), s_Stage1Crates, COUNT_OF(s_Stage1Crates) },
+    { "STAGE 2", -24.0f, 52.0f, s_Stage2Enemies, COUNT_OF(s_Stage2Enemies), s_Stage2Boxes, COUNT_OF(s_Stage2Boxes), s_Stage2Crates, COUNT_OF(s_Stage2Crates) },
+    { "STAGE 3", -28.0f, 64.0f, s_Stage3Enemies, COUNT_OF(s_Stage3Enemies), s_Stage3Boxes, COUNT_OF(s_Stage3Boxes), s_Stage3Crates, COUNT_OF(s_Stage3Crates) },
+    { "STAGE 4", -32.0f, 76.0f, s_Stage4Enemies, COUNT_OF(s_Stage4Enemies), s_Stage4Boxes, COUNT_OF(s_Stage4Boxes), s_Stage4Crates, COUNT_OF(s_Stage4Crates) },
+    { "STAGE 5", -36.0f, 92.0f, s_Stage5Enemies, COUNT_OF(s_Stage5Enemies), s_Stage5Boxes, COUNT_OF(s_Stage5Boxes), s_Stage5Crates, COUNT_OF(s_Stage5Crates) },
 };
 
 int GetStageCount()

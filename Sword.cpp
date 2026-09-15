@@ -3,6 +3,7 @@
 #include "modelRenderer.h"
 #include "animationModel.h"
 #include "Enemy.h"
+#include "Crate.h"
 #include "manager.h"
 #include "Collision.h"
 #include "Stats.h"
@@ -119,6 +120,51 @@ bool Sword::Use(GameObject* Owner)
 
         enemy->AddDamage(attackPower, critical);
         enemy->Shake(forward * 0.5f);
+        hit = true;
+    }
+
+    // Breakable crates, measured exactly the same way. A crate answers
+    // GetHitRadius and GetBodyHeight the way an enemy does precisely so this
+    // can be the same test rather than a second, subtly different one - a
+    // swing that visibly lands on a crate has to break it, or the crate
+    // reads as scenery and the player stops trying.
+    auto crates = Manager::GetGameObjs<Crate>();
+    for (auto crate : crates)
+    {
+        if (AlreadyHit(crate))
+            continue;
+
+        Vector3 toCrate = crate->GetPosition() - ownerPos;
+        toCrate.y = 0.0f;
+
+        float length = toCrate.lenght();
+
+        if (length > m_Range + crate->GetHitRadius())
+            continue;
+
+        float dy = ownerPos.y - crate->GetPosition().y; // + = owner is above
+        float verticalGap = 0.0f;
+
+        if (dy > crate->GetBodyHeight())
+            verticalGap = dy - crate->GetBodyHeight();
+        else if (dy < 0.0f)
+            verticalGap = -dy;
+
+        if (verticalGap > m_VerticalReach)
+            continue;
+
+        if (length <= 0.0f)
+            continue;
+
+        toCrate /= length;
+
+        if (Vector3::dot(forward, toCrate) < m_AngleDot)
+            continue;
+
+        MarkHit(crate);
+
+        crate->AddDamage(attackPower, critical);
+        crate->Shake(forward * 0.35f);
         hit = true;
     }
 

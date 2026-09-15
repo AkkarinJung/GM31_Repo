@@ -41,6 +41,9 @@ enum class SE
     CardSelect,
     StageClear,
 
+    CrateBreak,     // a breakable crate bursts
+    PotionPickup,   // what fell out of it is collected
+
     Count           // keep last
 };
 

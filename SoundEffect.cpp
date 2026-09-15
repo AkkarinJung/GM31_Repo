@@ -50,6 +50,14 @@ static const SoundDef s_Sounds[] =
     { SE::CardSelect,    "asset\\Audio\\SFX\\Select_Card.wav",        0.70f, "asset\\Audio\\pause.wav"     },
 
     { SE::StageClear,    "asset\\Audio\\SFX\\Stage_Clear.wav",        0.80f, "asset\\Audio\\gameclear.wav" },
+
+    // The crate break ships as a loose wav rather than under SFX, so it is
+    // named where it actually is instead of being moved.
+    { SE::CrateBreak,    "asset\\Audio\\crate_broken.wav",            0.70f, ""                            },
+    // No pickup sound of its own yet. The card select tick is short and
+    // bright, which is the right shape for it, so it stands in until there
+    // is one - the same way SpecialAttack borrows the third combo swing.
+    { SE::PotionPickup,  "asset\\Audio\\SFX\\Potion_Pickup.wav",       0.65f, "asset\\Audio\\SFX\\Select_Card.wav" },
 };
 
 static const int s_SoundCount = sizeof(s_Sounds) / sizeof(s_Sounds[0]);

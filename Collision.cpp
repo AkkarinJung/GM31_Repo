@@ -4,6 +4,7 @@
 #include "manager.h"
 #include "Box.h"
 #include "Hedge.h"
+#include "Crate.h"
 #include <algorithm>
 
 static float Clamp(float value, float minValue, float maxValue)
@@ -82,6 +83,16 @@ std::vector<AABB> Collision::GatherSolids()
     auto boxes = Manager::GetGameObjs<Box>();
     for (auto box : boxes)
         solids.push_back(SolidFromBox(box->GetPosition(), box->GetScale()));
+
+    // Breakable crates stand on their position the same way a platform does,
+    // so they go through the same helper. Being solid is what makes one worth
+    // breaking rather than walking through - and because they are destroyed
+    // rather than moved, a crate that blocks the way is a door, never a wall:
+    // it stops being a solid the moment it bursts, because this list is
+    // rebuilt from the live objects every time anything moves.
+    auto crates = Manager::GetGameObjs<Crate>();
+    for (auto crate : crates)
+        solids.push_back(SolidFromBox(crate->GetPosition(), crate->GetScale()));
 
     // The map edge. A hedge stands on its position the same way a crate does,
     // but its half size comes off the model it loaded rather than its scale,

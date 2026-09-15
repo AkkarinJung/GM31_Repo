@@ -30,6 +30,14 @@ struct BoxSpawn
     Vector3 Scale;
 };
 
+// A breakable crate. Only a position - every crate is the same size, and
+// what it drops is rolled when it breaks rather than authored here, so a
+// layout never has to say which ones are worth hitting.
+struct CrateSpawn
+{
+    Vector3 Position;
+};
+
 struct StageData
 {
     const char* Name;
@@ -44,6 +52,8 @@ struct StageData
     int EnemyCount;
     const BoxSpawn* Boxes;
     int BoxCount;
+    const CrateSpawn* Crates;
+    int CrateCount;
 };
 
 const StageData& GetStageData(int Index); // clamped, so a bad index cannot crash

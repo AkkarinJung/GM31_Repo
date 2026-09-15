@@ -6,6 +6,7 @@ C:\Users\pro19\Desktop\GM31_Repo\Bullet.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM3
 C:\Users\pro19\Desktop\GM31_Repo\Camera.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Camera.obj
 C:\Users\pro19\Desktop\GM31_Repo\Collision.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Collision.obj
 C:\Users\pro19\Desktop\GM31_Repo\ControlsUI.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\ControlsUI.obj
+C:\Users\pro19\Desktop\GM31_Repo\Crate.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Crate.obj
 C:\Users\pro19\Desktop\GM31_Repo\DamageNumber.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\DamageNumber.obj
 C:\Users\pro19\Desktop\GM31_Repo\Enemy.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Enemy.obj
 C:\Users\pro19\Desktop\GM31_Repo\EnemyAI.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\EnemyAI.obj
@@ -25,6 +26,7 @@ C:\Users\pro19\Desktop\GM31_Repo\modelRenderer.cpp;C:\Users\pro19\Desktop\GM31_R
 C:\Users\pro19\Desktop\GM31_Repo\Particle.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Particle.obj
 C:\Users\pro19\Desktop\GM31_Repo\Player.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Player.obj
 C:\Users\pro19\Desktop\GM31_Repo\Polygon2D.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Polygon2D.obj
+C:\Users\pro19\Desktop\GM31_Repo\Potion.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Potion.obj
 C:\Users\pro19\Desktop\GM31_Repo\Prop.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Prop.obj
 C:\Users\pro19\Desktop\GM31_Repo\renderer.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\renderer.obj
 C:\Users\pro19\Desktop\GM31_Repo\Result.cpp;C:\Users\pro19\Desktop\GM31_Repo\GM31_Game\x64\Debug\Result.obj
