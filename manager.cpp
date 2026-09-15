@@ -10,6 +10,7 @@
 #include "SoundEffect.h"
 #include "SlashEffect.h"
 #include "Font.h"
+#include "Collision.h"
 
 #include "GameObject.h"
 
@@ -58,6 +59,11 @@ void Manager::Update()
 {
 	float dt = 1.0f / 60.0f;
 	Input::Update();
+
+	// One list of solids per frame, shared by everything that moves or looks.
+	// Dropped here, before any object has had a chance to ask for it, so the
+	// first caller of the frame rebuilds it and the rest get it free.
+	Collision::InvalidateSolids();
 
 	if(m_Scene != nullptr)
 	m_Scene->Update();

@@ -76,9 +76,29 @@ AABB Collision::SolidFromBox(const Vector3& Position, const Vector3& Scale)
     return solid;
 }
 
-std::vector<AABB> Collision::GatherSolids()
+namespace
 {
-    std::vector<AABB> solids;
+    // The frame's solids. Kept between calls so the scene is walked once a
+    // frame rather than once per caller - see the note in Collision.h. Held
+    // by value, so a stale cache can never point at a deleted object.
+    std::vector<AABB> s_Solids;
+    bool s_SolidsValid = false;
+}
+
+void Collision::InvalidateSolids()
+{
+    s_SolidsValid = false;
+}
+
+const std::vector<AABB>& Collision::GatherSolids()
+{
+    if (s_SolidsValid)
+        return s_Solids;
+
+    // clear(), not a fresh vector: the capacity is kept, so after the first
+    // frame this rebuild allocates nothing.
+    std::vector<AABB>& solids = s_Solids;
+    solids.clear();
 
     auto boxes = Manager::GetGameObjs<Box>();
     for (auto box : boxes)
@@ -110,6 +130,7 @@ std::vector<AABB> Collision::GatherSolids()
         solids.push_back(solid);
     }
 
+    s_SolidsValid = true;
     return solids;
 }
 

@@ -200,8 +200,43 @@ private:
 
     void BeginDeath();
     void UpdateDeath();
-    const int m_HitStopOnHit = 5;
-    const float m_HitShake = 0.06f;
+    // How hard each step of the combo lands.
+    //
+    // All three steps used to deal identical damage, freeze for identical
+    // hitstop and kick the camera by an identical amount - which is why the
+    // finisher never landed like one. The VISUALS already scaled it: look at
+    // m_SlashStepScale below, where step 3 is 1.35x. So the third hit looked
+    // heavier than it hit, and the combo read as the same swing three times.
+    //
+    // Indexed by m_AttackCombo (0..2). Kept as three tables side by side so a
+    // fourth step cannot be added to one and forgotten in the others.
+    const float m_ComboDamageScale[3] = { 1.00f, 1.15f, 1.50f };
+    const int   m_ComboHitStop[3]     = {    4,     5,     9 };
+    const float m_ComboShake[3]       = { 0.05f, 0.06f, 0.11f };
+
+    // The counter is not a step in a chain - it is one heavy answer, bought
+    // with MP and with the risk of reading the enemy's telegraph wrong - so
+    // it lands off its own numbers rather than off the tables above.
+    const float m_SpecialDamageScale = 1.60f;
+    const int   m_SpecialHitStop = 10;
+    const float m_SpecialShake = 0.13f;
+
+    // Which of the above the swing in flight is using.
+    float SwingDamageScale() const;
+    int   SwingHitStop() const;
+    float SwingShake() const;
+
+    // How late a swing may still be turned round, as a fraction of the slice.
+    // Facing is chosen when the button goes down and movement is locked for
+    // the first 62% of the swing (m_AttackMoveUnlock), so an enemy that moved
+    // behind the player between the press and the strike meant a swing into
+    // empty air with nothing to be done about it. Up to this point the swing
+    // can be redirected; after it the direction is committed, which is what
+    // keeps the swing readable for the enemy and honest for the player.
+    //
+    // Set to the hit point so the window closes exactly as the blade comes
+    // out: you may change your mind right up until it would be a lie.
+    const float m_AttackTurnWindow = 0.35f;
 
     // A small step into the swing, so an attack has weight behind it.
     const float m_AttackLunge = 3.0f;

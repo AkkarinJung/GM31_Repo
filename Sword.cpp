@@ -40,7 +40,11 @@ bool Sword::Use(GameObject* Owner)
     // step threw away every percentage reward: +15% of 3.0 damage is 0.45,
     // which (int) truncated straight back to the original number.
     float damage = m_Damage + (ownerStats != nullptr ? (float)ownerStats->GetAttack() : 0.0f);
-    damage *= m_DamageMultiplier;
+
+    // Two separate multipliers, and they must stay separate: m_DamageMultiplier
+    // is the run's permanent rewards, m_SwingMultiplier is which step of the
+    // combo this particular swing is (see Player::SwingDamageScale).
+    damage *= m_DamageMultiplier * m_SwingMultiplier;
 
     // Rolled once for the swing, not once per enemy and not once per frame of
     // the active window, so a swing that hits two enemies crits on both or

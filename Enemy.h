@@ -165,6 +165,12 @@ private:
     float m_ShakeTime = 0.0f;
 
     class Stats* m_Stats = nullptr;
+
+    // The ground under this enemy. Cached, because finding it is a
+    // dynamic_cast over every object in the scene and it was being done once
+    // per ground enemy per frame - see Manager::GetGameObj.
+    class MeshField* m_MeshField = nullptr;
+
     bool m_Flash;
 
     GameObject* m_Shadow;

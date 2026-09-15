@@ -138,7 +138,7 @@ void Enemy::Update()
         m_Velocity.y = moveDirection.y * moveSpeed;
     m_Velocity.z = 0.0f;
 
-    std::vector<AABB> solids = Collision::GatherSolids();
+    const std::vector<AABB>& solids = Collision::GatherSolids();
 
     if (m_AI->IsFlying())
     {
@@ -160,10 +160,12 @@ void Enemy::Update()
         if (Collision::MoveY(m_Position, m_BodyHalfSize, m_Velocity.y * dt, solids, landed))
             m_Velocity.y = 0.0f;
 
-        MeshField* meshField = Manager::GetGameObj<MeshField>();
-        if (meshField != nullptr)
+        if (m_MeshField == nullptr)
+            m_MeshField = Manager::GetGameObj<MeshField>();
+
+        if (m_MeshField != nullptr)
         {
-            float ground = meshField->GetHeight(m_Position);
+            float ground = m_MeshField->GetHeight(m_Position);
             if (m_Position.y < ground)
             {
                 m_Position.y = ground;
@@ -426,6 +428,15 @@ void Enemy::AttackTarget()
     if (!CanReachTarget())
         return;
 
+    // The target died during the wind-up. The AI stops engaging a dead target
+    // (see EnemyAI::TargetAlive), but a swing already in the air is this
+    // class's to cancel - otherwise the killing blow was followed by a hurt
+    // grunt and a damage number over the death animation, and a ranged enemy
+    // launched one last wave at a corpse.
+    Stats* targetStats = target->GetGameComponent<Stats>();
+    if (targetStats != nullptr && targetStats->IsDead())
+        return;
+
     // Interrupted. The telegraph and the AI's state machine used to be
     // completely independent: hitting an enemy 0.15s into its 0.525s wind-up
     // put the AI into Stunned, but m_AttackWindup kept counting and the swing
@@ -485,10 +496,9 @@ void Enemy::AttackTarget()
         return;
     }
 
-    Stats* stats = target->GetGameComponent<Stats>();
-    if (stats != nullptr)
+    if (targetStats != nullptr)
     {
-        stats->TakeDamage(m_AttackDamage);
+        targetStats->TakeDamage(m_AttackDamage);
 
         if (player != nullptr)
             SoundEffect::Play(SE::PlayerHurt);

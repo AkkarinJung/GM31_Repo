@@ -38,6 +38,38 @@ float Player::AttackProgress() const
     return (t < 0.0f) ? 0.0f : (t > 1.0f ? 1.0f : t);
 }
 
+// Which swing is landing, for the three things that have to scale together:
+// how hard it hits, how long the impact freeze holds it, and how far the
+// camera kicks. Split out so the combo step is read in one place rather than
+// indexed into three tables at three different call sites.
+//
+// m_AttackCombo is always 0..2 (StartAttack keeps it there with % 3), but
+// these index arrays, so they clamp rather than trust that from a distance.
+static int ComboIndex(int Combo)
+{
+    if (Combo < 0) return 0;
+    if (Combo > 2) return 2;
+    return Combo;
+}
+
+float Player::SwingDamageScale() const
+{
+    return m_SpecialAttacking ? m_SpecialDamageScale
+                              : m_ComboDamageScale[ComboIndex(m_AttackCombo)];
+}
+
+int Player::SwingHitStop() const
+{
+    return m_SpecialAttacking ? m_SpecialHitStop
+                              : m_ComboHitStop[ComboIndex(m_AttackCombo)];
+}
+
+float Player::SwingShake() const
+{
+    return m_SpecialAttacking ? m_SpecialShake
+                              : m_ComboShake[ComboIndex(m_AttackCombo)];
+}
+
 // Turns "the swing should take this many seconds" into "advance the key
 // index by this much per tick", for whichever clip just started.
 //
@@ -397,24 +429,24 @@ void Player::Update()
     // 2.5D side-scroll movement: only left/right along world X - no
     // depth/forward-back input, since the camera no longer rotates to
     // face any other direction. Locked out while attacking.
+    //
+    // The direction itself is read whether or not movement is locked: the
+    // turn window further down needs it during the windup, which is exactly
+    // when MovementLocked() is true.
+    float steerX = 0.0f;
+    if (Input::GetKeyPress('D')) steerX += 1.0f;
+    if (Input::GetKeyPress('A')) steerX -= 1.0f;
+
     bool move = false;
 
-    if (!MovementLocked())
+    if (!MovementLocked() && steerX != 0.0f)
     {
         // Full speed out of a swing, reduced while the recovery plays out -
         // enough to reposition, not enough to make the recovery free.
         float speed = m_Attacking ? m_MoveSpeed * m_AttackMoveScale : m_MoveSpeed;
 
-        if (Input::GetKeyPress('D'))
-        {
-            m_Velocity.x += speed * dt;
-            move = true;
-        }
-        if (Input::GetKeyPress('A'))
-        {
-            m_Velocity.x -= speed * dt;
-            move = true;
-        }
+        m_Velocity.x += steerX * speed * dt;
+        move = true;
     }
 
     float tuneStep = 20.0f * dt;
@@ -457,6 +489,21 @@ void Player::Update()
     if ((steering || coasting) &&
         (fabsf(m_Velocity.x) > 0.01f || fabsf(m_Velocity.z) > 0.01f))
         m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
+
+    // A swing may still be turned round until the blade comes out.
+    //
+    // This reads the INPUT, not the velocity, which is what makes it safe to
+    // do mid-swing at all: the block above deliberately refuses to face off
+    // the velocity while attacking, because the lunge and the recoil are
+    // velocity too and reading the facing from them spun the player away from
+    // the enemy. A held direction key is unambiguous - it is the player
+    // saying which way they want to swing - so it does not have that problem.
+    //
+    // After m_AttackTurnWindow the direction is committed. Being able to
+    // rotate a swing that is already landing would make the arc unreadable
+    // and let a single press cover both sides of the player.
+    if (m_Attacking && steerX != 0.0f && AttackProgress() < m_AttackTurnWindow)
+        m_Rotation.y = atan2f(steerX, 0.0f);
 
     // oldGround, not m_Ground: m_Ground was cleared at the top of Update and
     // is not recomputed until after the position integration below, so it is
@@ -649,6 +696,10 @@ void Player::Update()
             // damages.
             SpawnSlash();
 
+            // Which step of the combo this is decides what it is worth. Set
+            // before BeginSwing so the very first frame of the active window
+            // already carries it - Use() runs on every frame of that window.
+            m_Weapon->SetSwingMultiplier(SwingDamageScale());
             m_Weapon->BeginSwing();
         }
 
@@ -665,12 +716,14 @@ void Player::Update()
             if (m_Weapon->Use(this))
             {
                 // Connected: hold the frame for a moment and kick the camera.
-                m_HitStopFrames = m_HitStopOnHit;
+                // Both scale with the combo step, so the finisher stops the
+                // frame and shoves the camera harder than the opener does.
+                m_HitStopFrames = SwingHitStop();
                 SoundEffect::Play(SE::SwordHit);
 
                 Camera* camera = Manager::GetGameObj<Camera>();
                 if (camera != nullptr)
-                    camera->Shake(GetFoward() * m_HitShake);
+                    camera->Shake(GetFoward() * SwingShake());
             }
         }
     }

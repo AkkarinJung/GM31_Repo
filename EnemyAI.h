@@ -12,6 +12,7 @@ enum class EnemyState
     Idle,
     Patrol,
     Chase,
+    Search,     // lost the target - go and look where it was last seen
     Attack,
     Stunned,
     Dead,
@@ -38,21 +39,54 @@ struct EnemyAIConfig
     // Half the cone, in radians, measured off the way the enemy is facing.
     // Once it is already fighting (or has been hit) the cone stops applying -
     // it knows where the player is, and losing track because the player
-    // stepped behind it mid-fight is worse than seeing too much.
+    // stepped behind it mid-fight is worse than seeing too much. The WALL
+    // check keeps applying either way; see LoseSightGrace.
     float VisionHalfAngle = 1.05f;   // ~60 degrees each side
     bool  RequireLineOfSight = true;
     float EyeHeight = 1.0f;          // looks from here, and at this height on the target
 
-    // Reaction. Rolled per enemy inside this range at spawn, so a group
+    // How often the line-of-sight segment test is actually run, in seconds.
+    // The cone and the range checks are arithmetic and stay per-frame; the
+    // wall test walks every solid in the map, so at one per enemy per frame a
+    // crowded stage spent more time asking "can I see you" than drawing.
+    // 0.1 is well inside a player's reaction time, and each enemy's phase is
+    // rolled at Configure so a group does not all test on the same frame.
+    float PerceptionInterval = 0.1f;
+
+    // Reaction. Rolled per enemy inside this range at Configure, so a group
     // notices the player raggedly instead of as one animal.
     float ReactionMin = 0.20f;
     float ReactionMax = 0.40f;
+
+    // Losing the target. A wall going up mid-fight does not erase what the
+    // enemy already knows: it keeps its fix for this long, then goes to look
+    // where the target was last actually seen rather than either snapping to
+    // "never heard of you" or tracking through the crate forever.
+    float LoseSightGrace = 1.2f;
+    float SearchTime = 2.5f;          // how long it hunts before giving up
+    float SearchSpeed = 2.0f;         // a hunting walk, not a charge
+    float SearchArriveDistance = 0.6f;// close enough to the last known spot
 
     // Giving up. Walking into something for this long ends the chase - a
     // grounded enemy cannot climb, and shoving a crate forever is the single
     // most broken-looking thing an enemy can do.
     float BlockedGiveUpTime = 1.0f;
     float DisengageTime = 3.0f;      // ignores the player for this long afterwards
+
+    // The other way a chase dies: not pushing into anything, just getting
+    // nowhere. BlockedGiveUpTime only catches an enemy leaning on a crate,
+    // because it compares the movement asked for against the movement got -
+    // and an enemy that has QUIETLY STOPPED is asking for nothing, so it
+    // accumulates nothing.
+    //
+    // That is the ledge case. A walker on a platform chases to the edge,
+    // comes inside its own stopping distance in X of a player standing on the
+    // ground below, stops because as far as it knows it has arrived, and can
+    // then neither reach the player nor register as blocked. It stands on the
+    // edge for the rest of the level. This clock is what sends it home: a
+    // chase that neither closes the distance nor produces a swing for this
+    // long is over.
+    float ChaseGiveUpTime = 5.0f;
 
     // Crowd control. Only the enemy holding the attack token may commit to a
     // swing; the rest keep their spacing and wait their turn. Without it every
@@ -70,6 +104,21 @@ struct EnemyAIConfig
     float ChaseSpeed = 2.5f;
     float StopDistance = 1.0f;
 
+    // Hysteresis around StopDistance. The enemy stops at StopDistance and does
+    // not start again until the target is StopDistance + StopBand away.
+    // Without the band, a player standing exactly at the stopping distance
+    // flipped the enemy between "walk" and "stand" every frame, which is the
+    // vibrating-around-the-player bug in its purest form.
+    float StopBand = 0.3f;
+
+    // How fast the enemy may change its ground speed, in units per second per
+    // second. Movement used to be a hard +/-1 direction at a fixed speed, so
+    // every enemy started, stopped and reversed instantly. These two are what
+    // make it lean into a charge and settle out of one; Deceleration is the
+    // higher of the pair because a stop that lags reads as ice.
+    float Acceleration = 14.0f;
+    float Deceleration = 20.0f;
+
     // Attack.
     bool  CanAttack = false;
 
@@ -81,6 +130,7 @@ struct EnemyAIConfig
     // This is the one line that makes an enemy ranged, so a preset changes
     // its whole role by flipping it - and the ranges below have to move with
     // it, because they mean reach for a swing and firing distance for a wave.
+    // It also decides which attack queue the enemy waits in; see TokenSlot.
     bool  RangedAttack = false;
     float AttackRange = 1.2f;
     float AttackHeight = 1.5f;   // vertical band it will commit to a swing in -
@@ -88,6 +138,12 @@ struct EnemyAIConfig
                                  // player standing on a crate above it
     float AttackCooldown = 1.5f;
     float AttackDuration = 0.4f; // how long the Attack state holds, i.e. the swing window
+
+    // Random spread on the cooldown, as a fraction either way (0.15 = +/-15%).
+    // Two enemies that took damage on the same frame otherwise stay in lockstep
+    // for the rest of the fight, and a pair swinging on the same beat reads as
+    // one attack the player cannot answer rather than as two they can.
+    float AttackCooldownVariance = 0.15f;
 
     // How tall the thing it swings at is. The DECISION to attack and the swing
     // that follows have to measure reach the same way or the enemy burns a
@@ -102,6 +158,14 @@ struct EnemyAIConfig
     float HoverHeight = 2.0f;
     float BobAmplitude = 0.0f;
     float BobSpeed = 3.0f;
+
+    // How hard a flier corrects its altitude: the vertical speed it asks for
+    // per unit of height error, capped at ChaseSpeed. Setting it equal to
+    // ChaseSpeed reproduces the hover this game has always had (the old code
+    // clamped the error to +/-1 and multiplied it by the chase speed, which
+    // is the same curve); raising it above that makes the hover stiffer and
+    // lowering it makes the flier lag its own bob.
+    float HoverGain = 2.0f;
 
     // 2.5D spacing. A soft nudge apart so several enemies converging on the
     // same target fan out along X instead of stacking into one silhouette.
@@ -136,6 +200,14 @@ struct EnemyAIConfig
 // which state it is in, where it wants to move, which way it should face and
 // when it wants to swing. Acting on those decisions (moving, animating,
 // dealing damage, rendering) stays with the owner GameObject.
+//
+// The contract with the owner is exactly one line:
+//
+//     velocity = GetMoveDirection() * GetMoveSpeed()
+//
+// GetMoveDirection is always unit length (or zero) and GetMoveSpeed carries
+// the whole magnitude, so an enemy can never travel faster than the speed its
+// config allows however many nudges went into the decision.
 class EnemyAI : public Component
 {
 private:
@@ -143,11 +215,21 @@ private:
     EnemyState m_State = EnemyState::Idle;
 
     class GameObject* m_Target = nullptr;
+    class Stats* m_TargetStats = nullptr;  // cached with the target - a dead
+                                           // target is not worth fighting
+    float m_TargetScanTimer = 0.0f;        // throttles the search for a target
+
+    class MeshField* m_MeshField = nullptr; // cached - a flier asked for it every frame
 
     Vector3 m_Home{ 0.0f, 0.0f, 0.0f };
     Vector3 m_MoveDirection{ 0.0f, 0.0f, 0.0f };
     float m_MoveSpeed = 0.0f;
     float m_Facing = 1.0f;
+
+    // The smoothed ground velocity behind GetMoveDirection/GetMoveSpeed.
+    // Signed, in units per second, so a turn-around eases through zero
+    // instead of flipping the enemy on one frame.
+    float m_VelocityX = 0.0f;
 
     float m_StateTime = 0.0f;
     float m_PauseTimer = 0.0f;
@@ -157,24 +239,53 @@ private:
     float m_BobTime = 0.0f;
     float m_PatrolDirection = 1.0f;
 
+    // Inside StopDistance and holding. Kept as a flag rather than recomputed
+    // from the distance so the stop and the start can use different
+    // thresholds - see EnemyAIConfig::StopBand.
+    bool m_HoldingPosition = false;
+
     // Senses and reaction.
-    float m_ReactionTime = 0.3f;   // rolled at Init from the config range
+    float m_ReactionTime = 0.3f;   // rolled at Configure from the config range
     float m_ReactionTimer = 0.0f;
     bool  m_Aware = false;         // finished reacting, so it may act
     bool  m_Alerted = false;       // has been hit - sees through its own blind spot
+
+    // Line of sight, sampled on an interval rather than every frame.
+    float m_PerceptionTimer = 0.0f;
+    bool  m_LineOfSight = false;
+    float m_LostSightTimer = 0.0f; // how long the wall has been up
+
+    // Where the target was when it was last actually seen, and how much
+    // longer this enemy will keep looking for it there.
+    Vector3 m_LastKnownPosition{ 0.0f, 0.0f, 0.0f };
+    bool  m_HasLastKnown = false;
+    float m_SearchTimer = 0.0f;
 
     // Giving up on an unreachable target.
     float m_BlockedTimer = 0.0f;
     float m_DisengageTimer = 0.0f;
     float m_LastX = 0.0f;
 
+    // Chase progress. The closest this chase has managed so far, and how long
+    // it has been since it last got closer or landed a swing. Negative best
+    // distance means "not started" - the first update of a chase seeds it.
+    float m_BestChaseDistance = -1.0f;
+    float m_NoProgressTimer = 0.0f;
+
     bool m_AttackRequested = false;
     bool m_HomeCaptured = false;
 
     // Whoever currently has permission to swing, and the beat enforced between
     // one enemy giving it up and the next taking it.
-    static EnemyAI* s_AttackToken;
-    static float s_TokenCooldown;
+    //
+    // One queue per attack kind. With a single shared token a turret firing
+    // from nine units away held the only permission in the level, so the
+    // melee enemy standing on the player could not answer - two enemies with
+    // nothing to do with each other were taking turns. Melee crowding is what
+    // the token exists to pace; a ranged enemy is paced by its own range.
+    static const int ATTACK_TOKEN_SLOTS = 2; // 0 = melee, 1 = ranged
+    static EnemyAI* s_AttackToken[ATTACK_TOKEN_SLOTS];
+    static float s_TokenCooldown[ATTACK_TOKEN_SLOTS];
 
     // Every live AI, used only for the separation check. A static list avoids
     // a manager class and keeps separation working for any GameObject that
@@ -184,16 +295,31 @@ private:
     void SetState(EnemyState State);
     void DecideState();
     void Steer();
-    void UpdateVertical();
+    float VerticalVelocity();
     void UpdateFacing();
+    void UpdateTarget();
+    void UpdateBlocked();
 
-    bool TargetDetected(float Distance) const;
-    bool CanSeeTarget() const;          // cone + line of sight
+    // True when this chase has stopped getting anywhere and should end.
+    bool ChaseGaveUp(float Distance);
+
+    // Everything the enemy knows about its target this frame, folded into one
+    // answer: true while it has a fix on it.
+    bool HasFixOnTarget(float Distance);
+    bool TargetAlive() const;
+    bool ConeContainsTarget() const;    // cheap, every frame
+    bool HasLineOfSight();              // expensive, on PerceptionInterval
     float HorizontalDistanceToTarget() const;
     float AttackVerticalGap() const;    // same shape as Enemy::CanReachTarget
     bool FacingTarget() const;
-    Vector3 SeparationBias() const;
+    float SeparationBias() const;
 
+    // Forget the target and, optionally, refuse to notice it again for a
+    // while. One place, because the blocked-on-a-crate path and the
+    // gave-up-searching path have to leave exactly the same state behind.
+    void Disengage(float IgnoreTime);
+
+    int  TokenSlot() const { return m_Config.RangedAttack ? 1 : 0; }
     bool TryTakeAttackToken();
     void ReleaseAttackToken();
 
@@ -204,8 +330,8 @@ public:
     void Uninit() override;
     void Update() override;
 
-    void Configure(const EnemyAIConfig& Config) { m_Config = Config; }
-    void SetTarget(GameObject* Target) { m_Target = Target; }
+    void Configure(const EnemyAIConfig& Config);
+    void SetTarget(GameObject* Target);
     void SetHome(const Vector3& Home) { m_Home = Home; m_HomeCaptured = true; }
 
     // Decisions for the owner to act on.
@@ -227,7 +353,7 @@ public:
 
     // True while this enemy is the one allowed to attack. The owner can use it
     // to tint or pose differently, so a crowd reads as "that one is coming".
-    bool HasAttackToken() const { return s_AttackToken == this; }
+    bool HasAttackToken() const { return s_AttackToken[TokenSlot()] == this; }
 
     // Something hit it, or something it should react to happened nearby.
     // Cancels a disengage and lets it act without needing to see first.
@@ -241,4 +367,9 @@ public:
     GameObject* GetOwner() const { return m_GameObject; }
     GameObject* GetTarget() const { return m_Target; }
     const Vector3& GetHome() const { return m_Home; }
+
+    // Development only, and free unless something asks for it. There is no
+    // line renderer in this project, so this is a label rather than a gizmo:
+    // print it with Font, or watch it in the debugger.
+    const char* GetStateName() const;
 };

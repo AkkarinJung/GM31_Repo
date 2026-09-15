@@ -57,9 +57,32 @@
 				material.TextureEnable = true;
 			}
 
-			material.Diffuse = XMFLOAT4(diffuse.r, diffuse.g, diffuse.b, opacity);
-			material.Ambient = material.Diffuse;
-			Renderer::SetMaterial(material);
+			// Hit flash and attack telegraph, done exactly the way the OBJ
+			// path does it - see ModelRenderer::Draw. The flash colour
+			// replaces the whole material and the texture is switched off,
+			// so the silhouette reads as one flat colour and the alpha in
+			// m_FlashColor drives the wind-up ramp.
+			//
+			// SetFlash and SetFlashColor already existed on this class, but
+			// nothing here ever READ them - they stored a value and returned.
+			// So every FBX enemy was silently exempt from both tells: the bee
+			// never flashed white when it was hit, and never showed the red
+			// pulse that is supposed to tell the player a swing is coming.
+			// The rabbit is a Wavefront OBJ and goes through ModelRenderer,
+			// which is why only it ever flashed.
+			if (m_Flash)
+			{
+				MATERIAL flash{};
+				flash.Diffuse = m_FlashColor;
+				flash.TextureEnable = false;
+				Renderer::SetMaterial(flash);
+			}
+			else
+			{
+				material.Diffuse = XMFLOAT4(diffuse.r, diffuse.g, diffuse.b, opacity);
+				material.Ambient = material.Diffuse;
+				Renderer::SetMaterial(material);
+			}
 
 
 			// 頂点バッファ設定

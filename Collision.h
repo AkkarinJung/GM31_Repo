@@ -58,7 +58,20 @@ public:
     static AABB SolidFromBox(const Vector3& Position, const Vector3& Scale);
 
     // Every solid in the scene. Called by whoever is about to move.
-    static std::vector<AABB> GatherSolids();
+    //
+    // Built once per frame and handed back by reference after that. It used
+    // to be rebuilt per call, and a call is a dynamic_cast over every object
+    // in the scene for each of the three solid types - with the tree line
+    // that is hundreds of objects, and the enemies alone asked for it twice
+    // each per frame (once to move, once for line of sight). Nothing in the
+    // world moves or is removed mid-frame (destruction is deferred to the
+    // reaper at the end of Manager::Update), so a frame-long cache returns
+    // exactly what rebuilding would have.
+    static const std::vector<AABB>& GatherSolids();
+
+    // Drops that cache. Called once per frame by Manager::Update, before
+    // anything has had a chance to ask.
+    static void InvalidateSolids();
 
     // Move along one axis and push back out of anything hit. Returns true
     // when the move was blocked, which is what the caller zeroes its

@@ -64,6 +64,13 @@ protected:
    // 15% of what the swing actually deals.
     float m_DamageMultiplier = 1.0f;
 
+    // Scales THIS SWING only, on top of m_DamageMultiplier. Which step of a
+    // combo is landing is a property of the swing, not of the weapon, so it
+    // is kept apart from m_DamageMultiplier on purpose: that one carries the
+    // run's permanent rewards, and folding a finisher's bonus into it would
+    // make the combo compound itself a little more every time it was used.
+    float m_SwingMultiplier = 1.0f;
+
 public:
     void Init() override;
     void Uninit() override;
@@ -99,5 +106,11 @@ public:
     void SetCriticalDamage(float CriticalDamage) { m_CriticalDamage = CriticalDamage; }
     float GetDamageMultiplier() const { return m_DamageMultiplier; }
     void SetDamageMultiplier(float DamageMultiplier) { m_DamageMultiplier = DamageMultiplier; }
+
+    // Set by the wielder just before BeginSwing, so the first frame of the
+    // active window already carries it. Deliberately NOT reset by
+    // BeginSwing: a wielder that never sets it simply leaves it at 1.
+    float GetSwingMultiplier() const { return m_SwingMultiplier; }
+    void SetSwingMultiplier(float SwingMultiplier) { m_SwingMultiplier = SwingMultiplier; }
     bool CanUse() const { return m_CooldownTimer <= 0.0f; }
 };
