@@ -22,8 +22,11 @@ static const float KEY_SIZE = 15.0f;
 
 static const XMFLOAT4 FRAME_COLOUR  = XMFLOAT4(0.85f, 0.85f, 0.90f, 0.85f);
 static const XMFLOAT4 EMPTY_COLOUR  = XMFLOAT4(0.06f, 0.07f, 0.10f, 0.72f);
-// The potions as they look on the floor - red bottle, blue bottle - so the
-// slot says which one it is without a label.
+// The icons are drawn unmodified, so this is white rather than a colour -
+// the bottle carries its own red or blue. It is still here because a missing
+// icon file falls back to a flat fill, and a flat WHITE square would say
+// nothing about which potion is in the slot.
+static const XMFLOAT4 ICON_TINT     = XMFLOAT4(1.00f, 1.00f, 1.00f, 1.00f);
 static const XMFLOAT4 HEALTH_COLOUR = XMFLOAT4(0.86f, 0.24f, 0.26f, 0.95f);
 static const XMFLOAT4 MANA_COLOUR   = XMFLOAT4(0.30f, 0.52f, 0.95f, 0.95f);
 
@@ -48,10 +51,37 @@ void PotionSlotUI::Init()
         "shader\\unlitTextureVS.cso");
     Renderer::CreatePixelShader(&m_PixelShader,
         "shader\\unlitTexturePS.cso");
+
+    // The bottles. Authored at 32x32 and supplied at 4x; the slot draws them
+    // at whatever CONTENT_INSET leaves, so the extra resolution is just there
+    // to survive a bigger slot later.
+    TexMetadata metadata;
+    ScratchImage image;
+
+    if (SUCCEEDED(LoadFromWICFile(L"asset\\texture\\potion_hp_128.png",
+        WIC_FLAGS_NONE, &metadata, image)))
+    {
+        CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+            image.GetImageCount(), metadata, &m_HealthIcon);
+    }
+
+    if (SUCCEEDED(LoadFromWICFile(L"asset\\texture\\potion_mp_128.png",
+        WIC_FLAGS_NONE, &metadata, image)))
+    {
+        CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
+            image.GetImageCount(), metadata, &m_ManaIcon);
+    }
+
+    // Deliberately not asserted. Every other texture in the project asserts,
+    // but a missing potion icon is not worth killing the build over - the
+    // slot falls back to the coloured square it used to draw.
 }
 
 void PotionSlotUI::Uninit()
 {
+    if (m_HealthIcon)   { m_HealthIcon->Release();   m_HealthIcon = nullptr; }
+    if (m_ManaIcon)     { m_ManaIcon->Release();     m_ManaIcon = nullptr; }
+
     if (m_VertexBuffer) { m_VertexBuffer->Release(); m_VertexBuffer = nullptr; }
     if (m_VertexLayout) { m_VertexLayout->Release(); m_VertexLayout = nullptr; }
     if (m_VertexShader) { m_VertexShader->Release(); m_VertexShader = nullptr; }
@@ -60,7 +90,7 @@ void PotionSlotUI::Uninit()
     GameObject::Uninit();
 }
 
-void PotionSlotUI::DrawFlatQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color)
+void PotionSlotUI::MapQuad(float X, float Y, float Width, float Height)
 {
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
     Renderer::GetDeviceContext()->VSSetShader(m_VertexShader, NULL, 0);
@@ -73,11 +103,6 @@ void PotionSlotUI::DrawFlatQuad(float X, float Y, float Width, float Height, con
     UINT offset = 0;
     Renderer::GetDeviceContext()->IASetVertexBuffers(0, 1, &m_VertexBuffer, &stride, &offset);
     Renderer::GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-    MATERIAL material{};
-    material.Diffuse = Color;
-    material.TextureEnable = false;
-    Renderer::SetMaterial(material);
 
     D3D11_MAPPED_SUBRESOURCE msr{};
     if (SUCCEEDED(Renderer::GetDeviceContext()->Map(m_VertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr)))
@@ -106,7 +131,39 @@ void PotionSlotUI::DrawFlatQuad(float X, float Y, float Width, float Height, con
 
         Renderer::GetDeviceContext()->Unmap(m_VertexBuffer, 0);
     }
+}
 
+void PotionSlotUI::DrawFlatQuad(float X, float Y, float Width, float Height, const XMFLOAT4& Color)
+{
+    MapQuad(X, Y, Width, Height);
+
+    MATERIAL material{};
+    material.Diffuse = Color;
+    material.TextureEnable = false;
+    Renderer::SetMaterial(material);
+
+    Renderer::GetDeviceContext()->Draw(4, 0);
+}
+
+void PotionSlotUI::DrawSprite(ID3D11ShaderResourceView* Texture,
+    float X, float Y, float Width, float Height, const XMFLOAT4& Tint)
+{
+    // No icon loaded - the slot keeps the coloured square it used to draw,
+    // which still says which potion is in it.
+    if (Texture == nullptr)
+    {
+        DrawFlatQuad(X, Y, Width, Height, Tint);
+        return;
+    }
+
+    MapQuad(X, Y, Width, Height);
+
+    MATERIAL material{};
+    material.Diffuse = Tint;
+    material.TextureEnable = true;
+    Renderer::SetMaterial(material);
+
+    Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &Texture);
     Renderer::GetDeviceContext()->Draw(4, 0);
 }
 
@@ -127,9 +184,14 @@ void PotionSlotUI::Draw()
         if (!PotionBag::IsFilled(slot))
             continue;
 
-        DrawFlatQuad(x + CONTENT_INSET, SLOT_Y + CONTENT_INSET,
+        bool health = PotionBag::GetType(slot) == PotionType::Health;
+
+        DrawSprite(health ? m_HealthIcon : m_ManaIcon,
+            x + CONTENT_INSET, SLOT_Y + CONTENT_INSET,
             SLOT_SIZE - CONTENT_INSET * 2.0f, SLOT_SIZE - CONTENT_INSET * 2.0f,
-            PotionBag::GetType(slot) == PotionType::Health ? HEALTH_COLOUR : MANA_COLOUR);
+            (health ? m_HealthIcon : m_ManaIcon) != nullptr
+                ? ICON_TINT
+                : (health ? HEALTH_COLOUR : MANA_COLOUR));
     }
 
     if (!Font::IsReady())

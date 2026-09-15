@@ -30,7 +30,8 @@ void Enemy::Init()
     m_Rotation.y -= XM_PI;
 
     m_Stats = AddGameComponent<Stats>(this);
-    m_Stats->SetMaxHP(30); // a few sword hits to kill - tune as needed
+    m_Stats->SetMaxHP(m_BaseMaxHP); // the stage scaling is applied by the
+                                    // spawner, see Enemy::ScaleForStage
 
     // Default behaviour; the spawner overrides it per enemy type with
     // GetAI()->Configure(...) - no Enemy subclass needed for a new type.
@@ -483,6 +484,27 @@ void Enemy::SpawnSwingEffect(const Vector3& Direction)
     slash->Play(position, Vector3(0.0f, 0.0f, roll),
         Vector3(m_SwingEffectSize, m_SwingEffectSize, 1.0f),
         m_SwingEffectLifetime, 1.0f, facing * m_SwingEffectSweep);
+}
+
+void Enemy::ScaleForStage(float HPScale, float DamageScale)
+{
+    if (m_Stats != nullptr)
+    {
+        int maxHP = (int)(m_BaseMaxHP * HPScale + 0.5f);
+        if (maxHP < 1)
+            maxHP = 1;
+
+        // SetMaxHP moves current HP by the same delta, so raising the ceiling
+        // on a freshly built enemy leaves it full - which is what a spawn
+        // wants. See Stats::SetMaxHP.
+        m_Stats->SetMaxHP(maxHP);
+    }
+
+    int damage = (int)(m_BaseAttackDamage * DamageScale + 0.5f);
+    if (damage < 1)
+        damage = 1;
+
+    m_AttackDamage = damage;
 }
 
 void Enemy::OnShotParried()

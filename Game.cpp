@@ -60,6 +60,30 @@ static EnemyAIConfig ConfigForType(EnemyType Type)
 	}
 }
 
+// How much tougher an enemy is on each stage after the first, as a fraction
+// of its base added per stage. Stage 1 is always exactly the base, so these
+// only ever make the run harder as it goes on - and they are linear rather
+// than compounding, because at five stages a multiplier per stage runs away
+// far faster than the player's one reward per stage can answer.
+//
+// At these values, across the five stages:
+//     HP      30  40  51  61  72     (+35% of base per stage)
+//     damage  20  24  28  32  36     (+20% of base per stage)
+//
+// HP climbs faster than damage on purpose. A longer fight is pressure the
+// player can answer with skill; a bigger hit is just a bigger hit, and with
+// HP carrying between stages now, damage compounds across the whole run.
+static const float ENEMY_HP_PER_STAGE = 0.35f;
+static const float ENEMY_DAMAGE_PER_STAGE = 0.20f;
+
+static float StageScale(int Stage, float PerStage)
+{
+	if (Stage < 0)
+		Stage = 0;
+
+	return 1.0f + Stage * PerStage;
+}
+
 // How hard each type is to shove around. A turret is a fixed emplacement
 // and barely budges; a flier is light enough to knock aside.
 static float MassForType(EnemyType Type)
@@ -339,6 +363,13 @@ void Game::Init()
 		enemy->SetPosition(spawn.Position);
 		enemy->GetAI()->Configure(ConfigForType(spawn.Type));
 		enemy->SetMass(MassForType(spawn.Type));
+
+		// Stage difficulty. Computed here rather than read from Game inside
+		// Enemy, the same way the AI preset and the mass are - which stage
+		// the run is on is this scene's business, and how an enemy answers
+		// it is the enemy's.
+		enemy->ScaleForStage(StageScale(s_Stage, ENEMY_HP_PER_STAGE),
+			StageScale(s_Stage, ENEMY_DAMAGE_PER_STAGE));
 	}
 
 	for (int i = 0; i < stage.BoxCount; i++)

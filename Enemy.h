@@ -9,7 +9,15 @@ private:
     // Decision making - what this enemy wants to do. Movement, animation and
     // damage below stay this class's responsibility.
     class EnemyAI* m_AI = nullptr;
-    int m_AttackDamage = 20;
+
+    // What an enemy is worth on the FIRST stage. Kept separate from the live
+    // values below so ScaleForStage can be applied to the base every time
+    // rather than to whatever the last call left behind - scaling a scaled
+    // number is how a stage 5 enemy ends up with thousands of HP.
+    const int m_BaseMaxHP = 30;        // a few sword hits to kill
+    const int m_BaseAttackDamage = 20;
+
+    int m_AttackDamage = m_BaseAttackDamage;
 
     // Where a thrown wave leaves this enemy, and what it aims at, both
     // measured up from the feet - every character here stands on its
@@ -164,6 +172,11 @@ public:
     // Critical only changes how the damage number reads - the extra damage
     // is already in Damage by the time it gets here.
     void AddDamage(int Damage, bool Critical = false);
+
+    // Applied by the spawner straight after this enemy is built, before
+    // anything reads its stats. Both multipliers are against the base
+    // values, so calling it twice with the same numbers changes nothing.
+    void ScaleForStage(float HPScale, float DamageScale);
 
     // A shot this enemy threw was parried on arrival. The answer is the same
     // one a parried swing gets, and it lives here rather than in EnemyShot so
