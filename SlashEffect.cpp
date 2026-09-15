@@ -14,7 +14,19 @@
 // earlier trail.png version got wrong - it could only ever be a straight
 // streak.) Swap in any crescent png here and the rest still works.
 // ---------------------------------------------------------------------------
-#define SLASH_TEXTURE  L"asset\\texture\\slash_crescent.png"
+#define SLASH_TEXTURE  L"asset\\texture\\Soword_Sheet.png"
+
+// The sheet is a 4x4 grid read left to right, top to bottom: a thin streak
+// that opens into a full crescent and then breaks up into sparks. The whole
+// run is fitted into the slash's lifetime, so a longer Lifetime plays the
+// same sixteen frames more slowly rather than showing fewer of them.
+#define SLASH_SHEET_COLS   4
+#define SLASH_SHEET_ROWS   4
+#define SLASH_SHEET_FRAMES (SLASH_SHEET_COLS * SLASH_SHEET_ROWS)
+
+// What the enemies keep using. One frame, no grid - it dies on its alpha
+// curve the way it always did.
+#define CRESCENT_TEXTURE L"asset\\texture\\slash_crescent.png"
 
 // Fraction of the texture the quad samples, from the centre. The crescent is
 // drawn with its own margin, so it takes the whole image.
@@ -36,7 +48,16 @@ static const float SWING_LENGTH_END   = 1.14f;  // ... and at t=1
 static const float SWING_THICK_START  = 0.74f;  // y scale multiplier at t=0
 static const float SWING_THICK_END    = 1.12f;  // ... and at t=1
 static const float SWING_ATTACK       = 0.10f;  // fraction of life spent fading in
-static const float SWING_DECAY        = 1.7f;   // higher = the tail dies faster
+// Gentle now that the sheet exists. The old 1.7 had the streak almost gone
+// by 70% of its life, which was right when a single unchanging crescent had
+// to die on its alpha alone - but the sheet's own last frames ARE the effect
+// breaking up, and at 1.7 they were faded out before they could be seen.
+static const float SWING_DECAY        = 0.45f;  // higher = the tail dies faster
+
+// The crescent's own decay, unchanged from before the sheet arrived. It has
+// no frames to break up with, so it still has to die on alpha alone - at the
+// sheet's gentle 0.45 it would simply hang in the air.
+static const float CRESCENT_DECAY     = 1.7f;
 static const float SWING_GAIN         = 1.5f;   // >1 widens the blown-out core
 
 // ---------------------------------------------------------------------------
@@ -53,7 +74,8 @@ static ID3D11Buffer*             s_VertexBuffer = nullptr;
 static ID3D11InputLayout*        s_VertexLayout = nullptr;
 static ID3D11VertexShader*       s_VertexShader = nullptr;
 static ID3D11PixelShader*        s_PixelShader = nullptr;
-static ID3D11ShaderResourceView* s_Texture = nullptr;
+static ID3D11ShaderResourceView* s_Texture = nullptr;          // the sword sheet
+static ID3D11ShaderResourceView* s_CrescentTexture = nullptr; // the enemies' one
 static bool                      s_Loaded = false;
 
 void SlashEffect::LoadShared()
@@ -94,10 +116,10 @@ void SlashEffect::LoadShared()
     vertex[3].TexCoord = XMFLOAT2(uv1, uv1);
 
     D3D11_BUFFER_DESC bd{};
-    bd.Usage = D3D11_USAGE_DEFAULT; // never rewritten, so it need not be dynamic
+    bd.Usage = D3D11_USAGE_DYNAMIC; // rewritten every draw - see the frame UVs in Draw
     bd.ByteWidth = sizeof(VERTEX_3D) * 4;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bd.CPUAccessFlags = 0;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     D3D11_SUBRESOURCE_DATA sd{};
     sd.pSysMem = vertex;
@@ -122,11 +144,27 @@ void SlashEffect::LoadShared()
 
     CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
         image.GetImageCount(), metadata, &s_Texture);
+
+    TexMetadata crescentMetadata;
+    ScratchImage crescentImage;
+
+    if (FAILED(LoadFromWICFile(CRESCENT_TEXTURE, WIC_FLAGS_NONE,
+        &crescentMetadata, crescentImage)))
+    {
+        // Also not fatal. Draw falls back to the sheet, which is wrong for an
+        // enemy but visible - better than a swing that does not appear.
+        OutputDebugStringA("SlashEffect: could not load the crescent texture\n");
+        return;
+    }
+
+    CreateShaderResourceView(Renderer::GetDevice(), crescentImage.GetImages(),
+        crescentImage.GetImageCount(), crescentMetadata, &s_CrescentTexture);
 }
 
 void SlashEffect::UninitShared()
 {
-    if (s_Texture)      { s_Texture->Release();      s_Texture = nullptr; }
+    if (s_Texture)         { s_Texture->Release();         s_Texture = nullptr; }
+    if (s_CrescentTexture) { s_CrescentTexture->Release(); s_CrescentTexture = nullptr; }
 
     if (s_VertexBuffer) { s_VertexBuffer->Release(); s_VertexBuffer = nullptr; }
     if (s_VertexLayout) { s_VertexLayout->Release(); s_VertexLayout = nullptr; }
@@ -245,7 +283,14 @@ void SlashEffect::Draw()
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
 
-    if (s_Texture == nullptr)
+    // Which artwork this slash wears. An enemy's keeps the single crescent;
+    // only the player plays the sheet. A missing crescent falls back to the
+    // sheet rather than drawing nothing.
+    const bool sheet = (m_Style == SlashStyle::SwordSheet) || (s_CrescentTexture == nullptr);
+
+    ID3D11ShaderResourceView* texture = sheet ? s_Texture : s_CrescentTexture;
+
+    if (texture == nullptr)
         return; // texture never loaded - nothing to draw
 
     // The swing, made out of the transform rather than out of frames:
@@ -287,7 +332,8 @@ void SlashEffect::Draw()
     if (t < SWING_ATTACK)
         alpha = t / SWING_ATTACK;
     else
-        alpha = powf(1.0f - (t - SWING_ATTACK) / (1.0f - SWING_ATTACK), SWING_DECAY);
+        alpha = powf(1.0f - (t - SWING_ATTACK) / (1.0f - SWING_ATTACK),
+            sheet ? SWING_DECAY : CRESCENT_DECAY);
 
     alpha *= m_StartAlpha * SWING_GAIN;
 
@@ -301,7 +347,56 @@ void SlashEffect::Draw()
 
     Renderer::SetMaterial(material);
 
-    Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &s_Texture);
+    Renderer::GetDeviceContext()->PSSetShaderResources(0, 1, &texture);
+
+    // Which cell of the sheet this instant of the swing is on. Clamped at
+    // the last frame rather than wrapping: a slash plays its sixteen frames
+    // once and dies, and a wrap would restart the streak just as it finished
+    // breaking up.
+    const int cols = sheet ? SLASH_SHEET_COLS : 1;
+    const int rows = sheet ? SLASH_SHEET_ROWS : 1;
+    const int frames = cols * rows;
+
+    int frame = (int)(t * frames);
+    if (frame < 0) frame = 0;
+    if (frame >= frames) frame = frames - 1;
+
+    const float frameW = 1.0f / (float)cols;
+    const float frameH = 1.0f / (float)rows;
+
+    // A crescent is a single image, so this comes out as the whole texture -
+    // exactly the UVs it had before the sheet existed.
+    float u0 = (frame % cols) * frameW;
+    float v0 = (frame / cols) * frameH;
+
+    // The buffer is shared by every live slash, so the UVs have to be written
+    // here, immediately before this instance draws - not once at load.
+    D3D11_MAPPED_SUBRESOURCE msr{};
+    if (SUCCEEDED(Renderer::GetDeviceContext()->Map(s_VertexBuffer, 0,
+        D3D11_MAP_WRITE_DISCARD, 0, &msr)))
+    {
+        VERTEX_3D* vertex = (VERTEX_3D*)msr.pData;
+
+        const float x0 = -1.0f, x1 = 1.0f;
+        const float y0 = 1.0f, y1 = -1.0f;
+
+        vertex[0].Position = XMFLOAT3(x0, y0, 0.0f);
+        vertex[0].TexCoord = XMFLOAT2(u0, v0);
+        vertex[1].Position = XMFLOAT3(x1, y0, 0.0f);
+        vertex[1].TexCoord = XMFLOAT2(u0 + frameW, v0);
+        vertex[2].Position = XMFLOAT3(x0, y1, 0.0f);
+        vertex[2].TexCoord = XMFLOAT2(u0, v0 + frameH);
+        vertex[3].Position = XMFLOAT3(x1, y1, 0.0f);
+        vertex[3].TexCoord = XMFLOAT2(u0 + frameW, v0 + frameH);
+
+        for (int i = 0; i < 4; i++)
+        {
+            vertex[i].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+            vertex[i].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+
+        Renderer::GetDeviceContext()->Unmap(s_VertexBuffer, 0);
+    }
 
     UINT stride = sizeof(VERTEX_3D);
     UINT offset = 0;

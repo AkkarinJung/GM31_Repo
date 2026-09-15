@@ -29,6 +29,11 @@
 // have run into the prompt at the bottom of the screen.
 static const float PLATE_BOTTOM = 389.0f;
 
+// Where the drawn headline sits, in the space the old painted plate used to
+// occupy. Everything below still starts at PLATE_BOTTOM, so the summary
+// layout is untouched.
+static const float HEADLINE_Y = 250.0f;
+
 static const float BODY_Y = PLATE_BOTTOM + 52.0f;
 static const float SUMMARY_X = SCREEN_WIDTH * 0.30f;
 static const float SUMMARY_GAP = 40.0f;
@@ -96,16 +101,19 @@ void Result::Init()
     // s_Stage is left pointing at the final stage when the run completes
     // (Game::Update only advances it when there is a next one), so this is
     // how many were actually finished.
-    m_StagesCleared = Game::IsRunComplete()
+    m_Complete = Game::IsRunComplete();
+
+    m_StagesCleared = m_Complete
         ? GetStageCount()
         : Game::GetStageIndex();
 
-    // GameClear.png had never been used by anything. The old screen showed
-    // result.png, which is the same shrine plate as the title with Japanese
-    // text burned into it - not a result screen at all.
+    // end_bg.png, and it carries NO text of its own - which is the point.
+    // GameClear.png had "Game Clear" painted into it, so a run that ended
+    // with the player dead still congratulated them. The headline is drawn
+    // in the font now (see Draw) and says what actually happened.
     Manager::AddGameObj<Polygon2D>()->Init(
         0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT,
-        L"asset\\texture\\GameClear.png");
+        L"asset\\texture\\end_bg.png");
 
     // The button frame, the same art the title menu uses.
     Manager::AddGameObj<Polygon2D>()->Init(
@@ -148,8 +156,24 @@ void Result::Draw()
 {
     const float centreX = SCREEN_WIDTH * 0.5f;
 
-    // No headline of our own: the image already has one, and drawing
-    // "RUN COMPLETE" above it would be the same thing said twice.
+    // The headline, which the background no longer supplies. It has to be
+    // drawn rather than painted in, because the same screen ends a run that
+    // was won and one that was lost and those are not the same sentence.
+    const char* headline = m_Complete ? "RUN COMPLETE" : "YOU DIED";
+
+    XMFLOAT4 headlineColour = m_Complete
+        ? XMFLOAT4(1.00f, 0.86f, 0.42f, 1.0f)   // gold
+        : XMFLOAT4(0.90f, 0.34f, 0.34f, 1.0f);  // red
+
+    Font::DrawCentered(headline, centreX + 4.0f, HEADLINE_Y + 5.0f, 76.0f, COLOUR_SHADOW);
+    Font::DrawCentered(headline, centreX, HEADLINE_Y, 76.0f, headlineColour);
+
+    const char* sub = m_Complete
+        ? "every stage cleared"
+        : "the run ends here";
+
+    Font::DrawCentered(sub, centreX + 2.0f, HEADLINE_Y + 88.0f + 2.0f, 21.0f, COLOUR_SHADOW);
+    Font::DrawCentered(sub, centreX, HEADLINE_Y + 88.0f, 21.0f, COLOUR_LABEL);
 
     char value[64];
 

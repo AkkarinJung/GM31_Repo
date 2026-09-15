@@ -28,7 +28,7 @@ struct SoundDef
 static const SoundDef s_Sounds[] =
 {
     { SE::Jump,          "asset\\Audio\\SFX\\Jump.wav",               0.55f, "asset\\Audio\\wan.wav"       },
-    { SE::Land,          "asset\\Audio\\SFX\\Land.wav",               0.40f, "asset\\Audio\\tyakuti.wav"   },
+    { SE::Land,          "asset\\Audio\\SFX\\Landed.wav",             0.40f, "asset\\Audio\\tyakuti.wav"   },
 
     { SE::PlayerAttack1, "asset\\Audio\\SFX\\Player_Atk_1.wav",       0.50f, ""                            },
     { SE::PlayerAttack2, "asset\\Audio\\SFX\\Player_Atk_2.wav",       0.50f, ""                            },
@@ -41,6 +41,7 @@ static const SoundDef s_Sounds[] =
     { SE::Parry,         "asset\\Audio\\SFX\\Parry.wav",              1.00f, ""                            },
 
     { SE::PlayerHurt,    "asset\\Audio\\SFX\\Player_Hurt.wav",        0.75f, ""                            },
+    { SE::PlayerDeath,   "asset\\Audio\\SFX\\Death.wav",              0.90f, "asset\\Audio\\gameover.wav" },
 
     { SE::EnemyAttack,   "asset\\Audio\\SFX\\Enemy_Attack_Sound.wav", 0.55f, ""                            },
     { SE::EnemyHurt,     "asset\\Audio\\SFX\\Enemy_Hurt.wav",         0.60f, ""                            },

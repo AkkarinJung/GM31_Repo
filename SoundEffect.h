@@ -34,6 +34,7 @@ enum class SE
     SpecialAttack,  // right click - the parry stance
     Parry,          // it worked
     PlayerHurt,
+    PlayerDeath,    // the run ends
     EnemyAttack,    // the wind-up, played with the red flash
     EnemyHurt,
     EnemyDeath,

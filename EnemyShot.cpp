@@ -115,6 +115,10 @@ void EnemyShot::EmitTrail()
 {
     SlashEffect* slash = Manager::AddGameObj<SlashEffect>();
 
+    // The crescent, like every other thing an enemy throws. The sword sheet
+    // is the player's swing and nothing else wears it.
+    slash->SetStyle(SlashStyle::Crescent);
+
     slash->Play(m_Position, Vector3(0.0f, 0.0f, m_Roll),
         Vector3(TRAIL_LENGTH, TRAIL_THICKNESS, 1.0f),
         TRAIL_LIFETIME, TRAIL_ALPHA,

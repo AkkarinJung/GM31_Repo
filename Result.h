@@ -7,6 +7,10 @@ private:
     // Captured in Init, not read live in Draw. Everything the summary reports
     // belongs to a run that has already ended, and the scene change has
     // already destroyed the objects that held it.
+    // Won or died. The screen is the same one either way, so it has to be
+    // told which run it is summarising.
+    bool m_Complete = false;
+
     int m_StagesCleared = 0;
     int m_Kills = 0;
 

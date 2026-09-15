@@ -181,6 +181,25 @@ private:
     // A short freeze on impact, then the camera kick - the two cheapest
     // things that make a hit read as a hit.
     int m_HitStopFrames = 0;
+
+    // ---- death ----------------------------------------------------------
+    //
+    // Nothing killed the player before this: Stats::IsDead() existed and was
+    // only ever asked about enemies, so reaching 0 HP did nothing at all and
+    // the run carried on. It ends the run now.
+    bool  m_Dead = false;
+    bool  m_ResultRequested = false;  // the scene change is asked for once
+    float m_DeathTimer = 0.0f;
+    float m_DeathFrame = 0.0f;
+
+    // How long the body lies there before the result screen takes over. Long
+    // enough for the animation to land and for the death sound to be heard
+    // as the end of something rather than as one more hit.
+    const float m_DeathHold = 2.6f;
+    const float m_DeathAnimRate = 1.0f;  // keys per frame, like every other clip
+
+    void BeginDeath();
+    void UpdateDeath();
     const int m_HitStopOnHit = 5;
     const float m_HitShake = 0.06f;
 

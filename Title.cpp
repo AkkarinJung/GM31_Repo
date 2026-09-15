@@ -18,9 +18,12 @@
 //
 // It is the only place the name appears, and it is drawn in the font rather
 // than baked into an image, so it costs nothing to rename.
+//
+// The ampersand is safe: Font bakes every glyph from 32 to 126 and '&' is
+// 38, so it comes out of the same atlas as the letters.
 // ---------------------------------------------------------------------------
-static const char* GAME_TITLE = "TORII";
-static const char* GAME_SUBTITLE = "a roguelike sword run";
+static const char* GAME_TITLE = "DECK & LUCK";
+static const char* GAME_SUBTITLE = "a roguelike game";
 
 // Layout, in screen pixels.
 static const float TITLE_Y = 140.0f;
@@ -69,11 +72,15 @@ void Title::Init()
     m_Selected = 0;
     m_Time = 0.0f;
 
-    // bg01.png, not title.png: the two are the same shrine painting, but
-    // title.png has Japanese text burned into it that cannot be moved or
-    // translated. bg01 is the clean plate.
+    // title_bg.png: a bright garden rather than the misty shrine bg01 used
+    // to show. The shrine plate was atmospheric but it belonged to a
+    // different game - this one is rabbits, bees, potions and a toon shader.
+    //
+    // It is composed around this menu: the scenery is pushed to the edges and
+    // the horizon kept low, so the whole centre column the title, subtitle
+    // and buttons sit on is plain sky. Nothing here needs a text plate.
     Polygon2D* background = Manager::AddGameObj<Polygon2D>();
-    background->Init(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, L"asset\\texture\\bg01.png");
+    background->Init(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, L"asset\\texture\\title_bg.png");
 
     // One frame per entry. Polygon2D bakes its rectangle into its vertex
     // buffer and draws with an identity matrix, so these cannot move - which

@@ -21,6 +21,7 @@
 #include "BoneAttachPoint.h"
 #include "Sword.h"
 #include "SlashEffect.h"
+#include "Result.h"
 #include "Particle.h"
 
 // How far through the current swing, 0..1. Anything that is not mid-swing
@@ -175,6 +176,88 @@ void Player::SetupSwingClock(const char* AnimationName)
     if (m_AttackRateRecover > MAX_RATE) m_AttackRateRecover = MAX_RATE;
 }
 
+void Player::BeginDeath()
+{
+    m_Dead = true;
+    m_DeathTimer = 0.0f;
+    m_DeathFrame = 0.0f;
+
+    // Drop everything mid-action. A swing left running would keep its hitbox
+    // and its slash, and the special would leave the parry window open on a
+    // corpse.
+    m_Attacking = false;
+    m_SpecialAttacking = false;
+    m_ParryTimer = 0.0f;
+    m_HitStopFrames = 0;
+
+    m_Velocity.x = 0.0f;
+    m_Velocity.z = 0.0f;
+
+    SetAnimation("Death");
+
+    // Played from here rather than from anything attached to the player: the
+    // scene is torn down at the end of this, and a voice owned by an object
+    // in it would be cut off with it. The same reason Enemy plays its death
+    // sound from Enemy.
+    SoundEffect::Play(SE::PlayerDeath);
+}
+
+void Player::UpdateDeath()
+{
+    const float dt = 1.0f / 60.0f;
+
+    m_DeathTimer += dt;
+
+    // Still falls. Dying in mid air and hanging there would read as the game
+    // having frozen rather than as the player having died.
+    m_Velocity.y += -98.0f * dt;
+
+    std::vector<AABB> solids = Collision::GatherSolids();
+
+    bool landed = false;
+    if (Collision::MoveY(m_Position, m_BodyHalfSize, m_Velocity.y * dt, solids, landed))
+        m_Velocity.y = 0.0f;
+
+    MeshField* meshField = Manager::GetGameObj<MeshField>();
+
+    if (meshField != nullptr)
+    {
+        float height = meshField->GetHeight(m_Position);
+
+        if (m_Position.y < height)
+        {
+            m_Position.y = height;
+            m_Velocity.y = 0.0f;
+        }
+    }
+
+    // Play the clip once and HOLD the last key. AnimationModel::Update takes
+    // frame % numKeys, so letting the counter run past the end would loop the
+    // death back to standing.
+    int length = m_AnimationModel->GetAnimationFrameCount("Death");
+
+    m_DeathFrame += m_DeathAnimRate;
+
+    if (length > 0 && m_DeathFrame > (float)(length - 1))
+        m_DeathFrame = (float)(length - 1);
+
+    m_NextAnimationFrame = (int)m_DeathFrame;
+    m_AnimationFrame = m_NextAnimationFrame;
+    m_Blend = 1.0f;
+
+    m_AnimationModel->Update("Death", m_AnimationFrame, "Death", m_NextAnimationFrame, 1.0f);
+
+    // Then the run is over. Asked for once - ChangeScene ignores a second
+    // call while one is pending, but the guard says so out loud.
+    if (!m_ResultRequested && m_DeathTimer >= m_DeathHold)
+    {
+        m_ResultRequested = true;
+        Manager::ChangeScene<Result>(2.0f);
+    }
+
+    GameObject::Update();
+}
+
 bool Player::MovementLocked() const
 {
     return m_Attacking && AttackProgress() < m_AttackMoveUnlock;
@@ -203,6 +286,7 @@ void Player::Init()
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Idle_model.fbx", "Idle");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Run.fbx", "Run");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Jump.fbx", "Jump");
+    m_AnimationModel->LoadAnimation("asset\\model\\Player_Movement\\Death.fbx", "Death");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_1.fbx", "Attack1");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_2.fbx", "Attack2");
     m_AnimationModel->LoadAnimation("asset\\model\\Player_Attack\\Attack_3.fbx", "Attack3");
@@ -251,6 +335,18 @@ void Player::Uninit()
 
 void Player::Update()
 {
+    // Death first, before a single line of input is read. Everything below
+    // this - the swing, the potions, the movement - belongs to a player who
+    // is still alive.
+    if (!m_Dead && m_Stats != nullptr && m_Stats->IsDead())
+        BeginDeath();
+
+    if (m_Dead)
+    {
+        UpdateDeath();
+        return;
+    }
+
     // 1/2/3 jump to the start / middle / end of the current swing, which is
     // how you check the grip at the extremes of the animation (F2 freezes).
     // These drive the swing clock, not the frame it derives - setting the

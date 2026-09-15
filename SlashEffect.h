@@ -27,6 +27,19 @@
 // all zeros already faces the camera; the other two axes tilt away from that.
 // Back-face culling is turned off while it draws, so no orientation can make
 // it disappear.
+// Which artwork a slash is drawn with.
+//
+// The player's swing plays the sixteen frame sword sheet. Everything an
+// ENEMY throws keeps the single crescent it always used - a thrown wave and
+// a rabbit's swipe reading exactly like the player's own sword is the kind
+// of sameness that makes a fight hard to follow. They are different sprites
+// on purpose, not one that has not been updated yet.
+enum class SlashStyle
+{
+    SwordSheet,  // 4x4 animated sheet - the player
+    Crescent,    // the original single frame - enemies
+};
+
 class SlashEffect : public GameObject
 {
 private:
@@ -54,6 +67,8 @@ private:
     // trail.png is a white blob, so additive is what turns it into light
     // rather than a grey smear. Switch it off for a sprite that carries its
     // own colour.
+    SlashStyle m_Style = SlashStyle::SwordSheet;
+
     bool m_Additive = true;
 
     // Off so the slash always reads on top of whatever it is cutting -
@@ -97,6 +112,11 @@ public:
     // Ride the weapon for the rest of this slash's life. Cancels the sweep -
     // the blade's own movement IS the sweep once this is on.
     void FollowWeapon(class GameObject* Weapon, float Reach, float Depth);
+
+    // Call before or after Play, but before the first Draw. Defaults to the
+    // sword sheet, so a new caller gets the player's look unless it says
+    // otherwise.
+    void SetStyle(SlashStyle Style) { m_Style = Style; }
 
     void SetAdditive(bool Additive) { m_Additive = Additive; }
     void SetDepthTest(bool DepthTest) { m_DepthTest = DepthTest; }

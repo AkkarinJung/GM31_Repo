@@ -524,6 +524,13 @@ void Enemy::SpawnSwingEffect(const Vector3& Direction)
     float facing = (direction.x < 0.0f) ? -1.0f : 1.0f;
 
     SlashEffect* slash = Manager::AddGameObj<SlashEffect>();
+
+    // The old crescent, not the player's sword sheet. An enemy's swipe
+    // reading exactly like the player's own sword makes a crowded fight hard
+    // to follow - whose swing was that is a question the player should never
+    // have to ask.
+    slash->SetStyle(SlashStyle::Crescent);
+
     slash->Play(position, Vector3(0.0f, 0.0f, roll),
         Vector3(m_SwingEffectSize, m_SwingEffectSize, 1.0f),
         m_SwingEffectLifetime, 1.0f, facing * m_SwingEffectSweep);
